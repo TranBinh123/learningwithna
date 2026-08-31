@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Hằng số
 const MAX_TEXT_LENGTH = 200;
-const BACKGROUND_MUSIC_URL = '/background-music.mp3'; // Đặt file nhạc của bạn
+const BACKGROUND_MUSIC_URL = '/bg-music.mp3'; // Đã khớp đúng tên file nhạc bạn tải lên
 const BACKGROUND_VOLUME = 0.15;
 
 const sanitizeText = (text: string): string => {
@@ -54,7 +54,7 @@ export function useSpeech(_voiceId?: string) {
       if (bgAudioRef.current) {
         bgAudioRef.current.pause();
         bgAudioRef.current.src = '';
-        bgAudioRef.current = null; // Đã sửa gán '' thành null cho đúng kiểu dữ liệu
+        bgAudioRef.current = null;
       }
     };
   }, []);
@@ -94,11 +94,14 @@ export function useSpeech(_voiceId?: string) {
       audioRef.current.currentTime = 0;
       setIsLoading(false);
     }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   }, []);
 
-  // Hàm speak chính
+  // Hàm speak chính sử dụng Web Speech API chuẩn của trình duyệt
   const speak = useCallback(async (text: string) => {
-    // 1. Unlock audio trước (nếu chưa)
+    // 1. Unlock audio trước
     await unlockAudio();
 
     // 2. Validate text
@@ -116,19 +119,6 @@ export function useSpeech(_voiceId?: string) {
     setIsLoading(true);
 
     try {
-      // Dừng audio cũ
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-
-      // Tạo URL Google TTS
-      const encodedText = encodeURIComponent(cleanText);
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&client=tw-ob`;
-
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
       // --- Bắt đầu phát nhạc nền (nếu chưa phát) ---
       if (bgAudioRef.current && bgAudioRef.current.paused) {
         try {
@@ -139,66 +129,50 @@ export function useSpeech(_voiceId?: string) {
         }
       }
 
-      // --- Promise cho audio TTS ---
-      const playPromise = new Promise((resolve, reject) => {
-        audio.onended = () => {
+      if (!('speechSynthesis' in window)) {
+        throw new Error('Trình duyệt không hỗ trợ phát âm thanh');
+      }
+
+      // Hủy các lệnh đọc đang xếp hàng trước đó
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 0.9; // Tốc độ đọc chậm rãi, rõ ràng cho bé
+
+      // Cố gắng tìm giọng tiếng Việt chính xác của hệ thống
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice = voices.find(v => v.lang === 'vi-VN' || v.lang.startsWith('vi'));
+      if (viVoice) {
+        utterance.voice = viVoice;
+      }
+
+      await new Promise((resolve, reject) => {
+        utterance.onend = () => {
           if (isMounted.current) {
             setIsLoading(false);
             resolve(true);
           }
         };
 
-        audio.onerror = (e) => {
+        utterance.onerror = (e) => {
           if (isMounted.current) {
-            const errorMsg = e instanceof Error ? e.message : 'Lỗi phát audio';
-            setError(`Không thể phát: ${errorMsg}`);
             setIsLoading(false);
             reject(e);
           }
         };
 
-        audio.play()
-          .then(() => {
-            // play thành công, chờ onended
-          })
-          .catch((playError) => {
-            if (playError.name === 'NotAllowedError') {
-              setError('Trình duyệt chặn tự động phát. Vui lòng nhấn vào nút "Đọc" một lần nữa.');
-            } else {
-              setError(`Lỗi phát: ${playError.message}`);
-            }
-            setIsLoading(false);
-            reject(playError);
-          });
+        window.speechSynthesis.speak(utterance);
       });
-
-      // Timeout 10s
-      const timeoutId = setTimeout(() => {
-        if (isMounted.current && isLoading) {
-          setError('Quá thời gian tải audio');
-          setIsLoading(false);
-        }
-      }, 10000);
-
-      await playPromise;
-      clearTimeout(timeoutId);
 
     } catch (e) {
       console.error('Không thể phát giọng đọc:', e);
       if (isMounted.current) {
         setIsLoading(false);
-        // Fallback: Web Speech API
-        if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.lang = 'vi-VN';
-          const voices = window.speechSynthesis.getVoices();
-          const viVoice = voices.find(v => v.lang === 'vi-VN');
-          if (viVoice) utterance.voice = viVoice;
-          window.speechSynthesis.speak(utterance);
-        }
+        setError('Không thể phát âm thanh');
       }
     }
-  }, [unlockAudio, isLoading]);
+  }, [unlockAudio]);
 
   return {
     speak,
