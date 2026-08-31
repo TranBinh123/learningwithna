@@ -1,47 +1,51 @@
-import { useCallback, useRef, useState } from 'react';
-import { fetchSpeechAudioUrl } from '@/lib/speechCache';
-import { getVoiceProfile } from '@/lib/voiceProfiles';
+import { useCallback, useState } from 'react';
 
-export function useSpeech(voiceId: string) {
+export function useSpeech(_voiceId?: string) {
   const [isLoading, setIsLoading] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const speak = useCallback(
-    async (text: string) => {
-      if (!text) return;
-      try {
-        setIsLoading(true);
-        const voice = getVoiceProfile(voiceId);
-        
-        console.log('Đang gọi giọng đọc cho:', text, 'với voice:', voice?.geminiVoiceName);
-        const url = await fetchSpeechAudioUrl(text, voice?.geminiVoiceName || 'Puck');
+  const speak = useCallback((text: string) => {
+    if (!text) return;
+    
+    // Kiểm tra xem trình duyệt có hỗ trợ Web Speech API không
+    if (!('speechSynthesis' in window)) {
+      console.warn('Trình duyệt của bạn không hỗ trợ giọng đọc.');
+      return;
+    }
 
-        if (!url) {
-          console.error('Không nhận được URL âm thanh từ dịch vụ.');
-          setIsLoading(false);
-          return;
-        }
+    try {
+      setIsLoading(true);
+      
+      // Hủy các giọng đọc đang đọc dở để không bị chồng chéo âm thanh
+      window.speechSynthesis.cancel();
 
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        
-        setIsLoading(false);
-        
-        // Thêm bắt lỗi chi tiết để xem trình duyệt có chặn autoplay hay không
-        await audio.play().catch((err) => {
-          console.warn('Trình duyệt có thể đã chặn phát âm thanh tự động:', err);
-        });
-      } catch (e) {
-        console.error('Lỗi chi tiết khi phát giọng đọc:', e);
-        setIsLoading(false);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'vi-VN'; // Đặt mặc định là tiếng Việt
+      utterance.rate = 0.9; // Tốc độ đọc chậm rãi, phù hợp cho trẻ em (0.5 đến 2)
+      utterance.pitch = 1.1; // Tone giọng hơi cao và vui tươi hơn một chút
+
+      // Lấy danh sách giọng đọc có sẵn trong máy để ưu tiên chọn giọng tiếng Việt chuẩn nếu có
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice = voices.find((v) => v.lang.includes('vi') || v.lang.includes('VI'));
+      if (viVoice) {
+        utterance.voice = viVoice;
       }
-    },
-    [voiceId]
-  );
+
+      utterance.onend = () => {
+        setIsLoading(false);
+      };
+
+      utterance.onerror = (e) => {
+        console.error('Lỗi phát giọng đọc từ trình duyệt:', e);
+        setIsLoading(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+      setIsLoading(false);
+    } catch (e) {
+      console.error('Lỗi ngoại lệ khi gọi Web Speech API:', e);
+      setIsLoading(false);
+    }
+  }, []);
 
   return { speak, isLoading };
 }
