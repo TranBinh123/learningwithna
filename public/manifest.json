@@ -1,0 +1,15 @@
+{
+  "name": "Học Cùng Na",
+  "short_name": "Học Với Na",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffb703",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
