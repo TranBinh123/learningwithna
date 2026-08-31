@@ -1,20 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const MAX_TEXT_LENGTH = 200;
-
-const sanitizeText = (text: string): string => {
-  if (!text) return '';
-  const cleanText = text.replace(/<[^>]*>/g, '');
-  return cleanText.slice(0, MAX_TEXT_LENGTH);
-};
-
 export function useSpeech(_voiceId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isMounted = useRef(true);
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
@@ -28,19 +19,6 @@ export function useSpeech(_voiceId?: string) {
     };
   }, []);
 
-  const unlockAudio = useCallback(async () => {
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        await audioCtxRef.current.resume();
-      }
-    } catch (err) {
-      console.warn('Không thể resume AudioContext:', err);
-    }
-  }, []);
-
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -49,18 +27,9 @@ export function useSpeech(_voiceId?: string) {
     }
   }, []);
 
-  const speak = useCallback(async (text: string) => {
-    await unlockAudio();
-
-    const cleanText = sanitizeText(text);
-    if (!cleanText) {
-      setError('Văn bản trống hoặc không hợp lệ');
-      return;
-    }
-    if (cleanText.length > MAX_TEXT_LENGTH) {
-      setError(`Văn bản quá dài (tối đa ${MAX_TEXT_LENGTH} ký tự)`);
-      return;
-    }
+  // Hàm phát tổng quát nhận vào đường dẫn tương đối trong thư mục /audios/
+  const playAudioFile = useCallback(async (relativePath: string) => {
+    if (!relativePath) return;
 
     setError(null);
     setIsLoading(true);
@@ -71,10 +40,9 @@ export function useSpeech(_voiceId?: string) {
         audioRef.current = null;
       }
 
-      const encodedText = encodeURIComponent(cleanText);
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&client=tw-ob`;
-
-      const audio = new Audio(audioUrl);
+      // Hỗ trợ tự động nhận diện đuôi .wav hoặc .mp3 nếu chưa có
+      const fullUrl = `/audios/${relativePath}`;
+      const audio = new Audio(fullUrl);
       audioRef.current = audio;
 
       await new Promise((resolve, reject) => {
@@ -95,16 +63,48 @@ export function useSpeech(_voiceId?: string) {
       });
 
     } catch (err) {
-      console.error('Không thể phát giọng đọc:', err);
+      console.error('Không thể phát file âm thanh:', err);
       if (isMounted.current) {
         setIsLoading(false);
         setError('Không thể phát âm thanh');
       }
     }
-  }, [unlockAudio]);
+  }, []);
+
+  // 1. Phát ngẫu nhiên lời động viên (4 file: enc_1 đến enc_4)
+  const playRandomEncouragement = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * 4) + 1;
+    playAudioFile(`encouragements/enc_${randomIndex}.mp3`);
+  }, [playAudioFile]);
+
+  // 2. Phát ngẫu nhiên lời khen ngợi chung (9 file: praise_1 đến praise_9)
+  const playRandomPraise = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * 9) + 1;
+    playAudioFile(`praises/praise_${randomIndex}.mp3`);
+  }, [playAudioFile]);
+
+  // 3. Phát âm thanh theo bước bài học (Ví dụ: lesson 1, bước 1.3, loại 'normal' | 'again' | 'praise')
+  const playLessonStep = useCallback((lessonNum: number, step: string, type: 'normal' | 'again' | 'praise' = 'normal') => {
+    let fileName = '';
+    const folder = `lessons/lesson_${lessonNum}`;
+
+    if (type === 'again') {
+      fileName = `${step}_again.mp3`;
+    } else if (type === 'praise') {
+      fileName = `${step}_praise.mp3`;
+    } else {
+      // Mặc định ưu tiên file .wav cho các bước chính, hoặc bạn có thể đổi thành .mp3 tùy ý
+      fileName = `${step}.wav`;
+    }
+
+    playAudioFile(`${folder}/${fileName}`);
+  }, [playAudioFile]);
 
   return {
-    speak,
+    playAudioFile,
+    playRandomEncouragement,
+    playRandomPraise,
+    playLessonStep,
     stop,
     isLoading,
     error,
