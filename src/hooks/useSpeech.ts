@@ -6,7 +6,6 @@ export function useSpeech(_voiceId?: string) {
   const speak = useCallback((text: string) => {
     if (!text) return;
     
-    // Kiểm tra xem trình duyệt có hỗ trợ Web Speech API không
     if (!('speechSynthesis' in window)) {
       console.warn('Trình duyệt của bạn không hỗ trợ giọng đọc.');
       return;
@@ -15,37 +14,52 @@ export function useSpeech(_voiceId?: string) {
     try {
       setIsLoading(true);
       
-      // Hủy các giọng đọc đang đọc dở để không bị chồng chéo âm thanh
+      // Hủy các giọng đọc đang đọc dở
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'vi-VN'; // Đặt mặc định là tiếng Việt
-      utterance.rate = 0.9; // Tốc độ đọc chậm rãi, phù hợp cho trẻ em (0.5 đến 2)
-      utterance.pitch = 1.1; // Tone giọng hơi cao và vui tươi hơn một chút
+      utterance.lang = 'vi-VN'; // Ép buộc nhận diện ngôn ngữ tiếng Việt
+      utterance.rate = 0.85; // Giảm tốc độ xuống một chút để bé nghe rõ từng từ
+      utterance.pitch = 1.1; // Tone giọng tươi vui
 
-      // Lấy danh sách giọng đọc có sẵn trong máy để ưu tiên chọn giọng tiếng Việt chuẩn nếu có
+      // Hàm tìm và chọn chính xác giọng tiếng Việt
+      const setVietnameseVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        // Lọc các giọng có chứa mã vi, vietnamese hoặc vi-VN
+        const viVoice = voices.find(
+          (v) => v.lang.toLowerCase().includes('vi') || v.name.toLowerCase().includes('vietnamese')
+        );
+        if (viVoice) {
+          utterance.voice = viVoice;
+        }
+        
+        window.speechSynthesis.speak(utterance);
+        setIsLoading(false);
+      };
+
+      // Trình duyệt đôi khi mất chút thời gian để load danh sách voices
       const voices = window.speechSynthesis.getVoices();
-      const viVoice = voices.find((v) => v.lang.includes('vi') || v.lang.includes('VI'));
-      if (viVoice) {
-        utterance.voice = viVoice;
+      if (voices.length > 0) {
+        setVietnameseVoice();
+      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          setVietnameseVoice();
+          window.speechSynthesis.onvoiceschanged = null; // Reset sự kiện sau khi chạy xong
+        };
+        // Fallback nếu sự kiện onvoiceschanged không gọi
+        setTimeout(() => {
+          if (isLoading) {
+            window.speechSynthesis.speak(utterance);
+            setIsLoading(false);
+          }
+        }, 300);
       }
 
-      utterance.onend = () => {
-        setIsLoading(false);
-      };
-
-      utterance.onerror = (e) => {
-        console.error('Lỗi phát giọng đọc từ trình duyệt:', e);
-        setIsLoading(false);
-      };
-
-      window.speechSynthesis.speak(utterance);
-      setIsLoading(false);
     } catch (e) {
       console.error('Lỗi ngoại lệ khi gọi Web Speech API:', e);
       setIsLoading(false);
     }
-  }, []);
+  }, [isLoading]);
 
   return { speak, isLoading };
 }
