@@ -73,20 +73,28 @@ export function useSpeech(_voiceId?: string) {
     }
   }, []);
 
-  // Bật/tắt nhạc nền (có thể gọi từ UI)
+  // Bật/tắt nhạc nền (đã fix lỗi bị chồng chéo bản nhạc trên Tablet)
   const toggleBackground = useCallback(() => {
     if (!bgAudioRef.current) return;
-    if (bgAudioRef.current.paused) {
-      bgAudioRef.current.play().catch(err => {
-        console.warn('Không thể phát nhạc nền:', err);
-      });
-      setIsBackgroundPlaying(true);
-    } else {
-      bgAudioRef.current.pause();
-      setIsBackgroundPlaying(false);
-    }
-  }, []);
 
+    if (isBackgroundPlaying) {
+      // Nếu đang phát -> Dừng hẳn và đưa về mốc thời gian 0
+      bgAudioRef.current.pause();
+      bgAudioRef.current.currentTime = 0;
+      setIsBackgroundPlaying(false);
+    } else {
+      // Nếu đang tắt -> Đảm bảo dừng mọi thứ trước khi cho chạy mới
+      bgAudioRef.current.pause();
+      bgAudioRef.current.currentTime = 0;
+      
+      bgAudioRef.current.play().then(() => {
+        setIsBackgroundPlaying(true);
+      }).catch(err => {
+        console.warn('Không thể phát nhạc nền:', err);
+        setIsBackgroundPlaying(false);
+      });
+    }
+  }, [isBackgroundPlaying]);
   // Dừng tất cả âm thanh
   const stop = useCallback(() => {
     if (audioRef.current) {
