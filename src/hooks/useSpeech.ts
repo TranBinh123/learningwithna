@@ -53,8 +53,8 @@ export function useSpeech(_voiceId?: string) {
       }
       if (bgAudioRef.current) {
         bgAudioRef.current.pause();
-        bgAudioRef.current = '';
-        bgAudioRef.current = null;
+        bgAudioRef.current.src = '';
+        bgAudioRef.current = null; // Đã sửa gán '' thành null cho đúng kiểu dữ liệu
       }
     };
   }, []);
@@ -94,7 +94,6 @@ export function useSpeech(_voiceId?: string) {
       audioRef.current.currentTime = 0;
       setIsLoading(false);
     }
-    // Không dừng nhạc nền ở đây (để user có thể tiếp tục nghe)
   }, []);
 
   // Hàm speak chính
@@ -163,7 +162,6 @@ export function useSpeech(_voiceId?: string) {
             // play thành công, chờ onended
           })
           .catch((playError) => {
-            // Xử lý lỗi autoplay
             if (playError.name === 'NotAllowedError') {
               setError('Trình duyệt chặn tự động phát. Vui lòng nhấn vào nút "Đọc" một lần nữa.');
             } else {
@@ -193,7 +191,6 @@ export function useSpeech(_voiceId?: string) {
         if ('speechSynthesis' in window) {
           const utterance = new SpeechSynthesisUtterance(cleanText);
           utterance.lang = 'vi-VN';
-          // Tìm giọng tiếng Việt nếu có
           const voices = window.speechSynthesis.getVoices();
           const viVoice = voices.find(v => v.lang === 'vi-VN');
           if (viVoice) utterance.voice = viVoice;
@@ -206,9 +203,9 @@ export function useSpeech(_voiceId?: string) {
   return {
     speak,
     stop,
-    toggleBackground,  // Thêm function để user bật/tắt nhạc nền
+    toggleBackground,
     isLoading,
     error,
-    isBackgroundPlaying, // Trạng thái nhạc nền
+    isBackgroundPlaying,
   };
 }
