@@ -8,22 +8,35 @@ export function useSpeech(voiceId: string) {
 
   const speak = useCallback(
     async (text: string) => {
+      if (!text) return;
       try {
         setIsLoading(true);
         const voice = getVoiceProfile(voiceId);
-        const url = await fetchSpeechAudioUrl(text, voice.geminiVoiceName);
+        
+        console.log('Đang gọi giọng đọc cho:', text, 'với voice:', voice?.geminiVoiceName);
+        const url = await fetchSpeechAudioUrl(text, voice?.geminiVoiceName || 'Puck');
+
+        if (!url) {
+          console.error('Không nhận được URL âm thanh từ dịch vụ.');
+          setIsLoading(false);
+          return;
+        }
 
         if (audioRef.current) {
           audioRef.current.pause();
         }
+        
         const audio = new Audio(url);
         audioRef.current = audio;
+        
         setIsLoading(false);
-        await audio.play().catch(() => {
-          /* trình duyệt có thể chặn autoplay trước khi bé tương tác lần đầu — bỏ qua lỗi này */
+        
+        // Thêm bắt lỗi chi tiết để xem trình duyệt có chặn autoplay hay không
+        await audio.play().catch((err) => {
+          console.warn('Trình duyệt có thể đã chặn phát âm thanh tự động:', err);
         });
       } catch (e) {
-        console.error('Lỗi phát giọng đọc:', e);
+        console.error('Lỗi chi tiết khi phát giọng đọc:', e);
         setIsLoading(false);
       }
     },
