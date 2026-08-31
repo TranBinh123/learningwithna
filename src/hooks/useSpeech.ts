@@ -27,9 +27,9 @@ export function useSpeech(_voiceId?: string) {
     }
   }, []);
 
-  // Hàm phát tổng quát nhận vào đường dẫn tương đối trong thư mục /audios/
-  const playAudioFile = useCallback(async (relativePath: string) => {
-    if (!relativePath) return;
+  // Hàm speak chính tương thích với các component cũ (nhận vào đường dẫn file hoặc tên file)
+  const speak = useCallback(async (audioPath: string) => {
+    if (!audioPath) return;
 
     setError(null);
     setIsLoading(true);
@@ -40,8 +40,8 @@ export function useSpeech(_voiceId?: string) {
         audioRef.current = null;
       }
 
-      // Hỗ trợ tự động nhận diện đuôi .wav hoặc .mp3 nếu chưa có
-      const fullUrl = `/audios/${relativePath}`;
+      // Nếu path chưa có dấu / hoặc chưa có thư mục, tự động gán vào /audios/
+      const fullUrl = audioPath.startsWith('/') ? audioPath : `/audios/${audioPath}`;
       const audio = new Audio(fullUrl);
       audioRef.current = audio;
 
@@ -74,14 +74,14 @@ export function useSpeech(_voiceId?: string) {
   // 1. Phát ngẫu nhiên lời động viên (4 file: enc_1 đến enc_4)
   const playRandomEncouragement = useCallback(() => {
     const randomIndex = Math.floor(Math.random() * 4) + 1;
-    playAudioFile(`encouragements/enc_${randomIndex}.mp3`);
-  }, [playAudioFile]);
+    speak(`encouragements/enc_${randomIndex}.mp3`);
+  }, [speak]);
 
   // 2. Phát ngẫu nhiên lời khen ngợi chung (9 file: praise_1 đến praise_9)
   const playRandomPraise = useCallback(() => {
     const randomIndex = Math.floor(Math.random() * 9) + 1;
-    playAudioFile(`praises/praise_${randomIndex}.mp3`);
-  }, [playAudioFile]);
+    speak(`praises/praise_${randomIndex}.mp3`);
+  }, [speak]);
 
   // 3. Phát âm thanh theo bước bài học (Ví dụ: lesson 1, bước 1.3, loại 'normal' | 'again' | 'praise')
   const playLessonStep = useCallback((lessonNum: number, step: string, type: 'normal' | 'again' | 'praise' = 'normal') => {
@@ -93,15 +93,14 @@ export function useSpeech(_voiceId?: string) {
     } else if (type === 'praise') {
       fileName = `${step}_praise.mp3`;
     } else {
-      // Mặc định ưu tiên file .wav cho các bước chính, hoặc bạn có thể đổi thành .mp3 tùy ý
       fileName = `${step}.wav`;
     }
 
-    playAudioFile(`${folder}/${fileName}`);
-  }, [playAudioFile]);
+    speak(`${folder}/${fileName}`);
+  }, [speak]);
 
   return {
-    playAudioFile,
+    speak, // Giữ lại hàm speak để các màn hình cũ gọi bình thường không bị lỗi TypeScript
     playRandomEncouragement,
     playRandomPraise,
     playLessonStep,
