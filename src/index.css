@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  font-family: 'Baloo 2', 'Quicksand', system-ui, sans-serif;
+  overscroll-behavior: none;
+}
