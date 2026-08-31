@@ -33,7 +33,7 @@ export default function App() {
     // Bạn có thể thay đổi đường dẫn file nhạc nền trong thư mục public (ví dụ: /bg-music.mp3)
     const audio = new Audio('/bg-music.mp3');
     audio.loop = true;
-    audio.volume = 0.5; // Âm lượng vừa phải để không lấn át giọng đọc của bé
+    audio.volume = 0.2; // Âm lượng vừa phải để không lấn át giọng đọc của bé
     backgroundAudioRef.current = audio;
 
     return () => {
