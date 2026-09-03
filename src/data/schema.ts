@@ -5,12 +5,11 @@
 // buộc để bé chơi được.
 // ============================================================================
 
-// Một "khái niệm" bé sẽ chọn/nhận diện — dùng chung cho màu, con vật, đồ vật...
 export interface ConceptOption {
   id: string;
-  name: string; // dùng nội bộ + hiển thị trong khu quản lý phụ huynh
-  emoji?: string; // ưu tiên hiển thị dạng emoji nếu có
-  hex?: string; // nếu có, hiển thị dạng khối màu (ví dụ bài học màu sắc)
+  name: string;
+  emoji?: string;
+  hex?: string;
 }
 
 export interface IntroScene {
@@ -23,9 +22,9 @@ export interface IntroScene {
 export interface TeachScene {
   type: 'teach';
   id: string;
-  narrationIntro: string; // đọc khi vào scene
-  concept: ConceptOption; // đối tượng đang dạy (màu/con vật/...)
-  narrationOnTap: string; // đọc khi bé chạm vào đối tượng
+  narrationIntro: string;
+  concept: ConceptOption;
+  narrationOnTap: string;
 }
 
 export interface GameQuestion {
@@ -61,11 +60,13 @@ export type LessonScene = IntroScene | TeachScene | GameScene | ReviewScene;
 export interface Lesson {
   id: string;
   ageGroup: string;
-  title: string; // chỉ hiển thị cho phụ huynh (khu quản lý + danh sách chọn bài)
-  emoji: string; // icon đại diện bài học, hiển thị cho bé chọn (không cần đọc chữ)
+  title: string;
+  emoji: string;
   scenes: LessonScene[];
   totalStars: number;
   createdBy: 'builtin' | 'parent';
   defaultVoiceId: string;
-  offScreenActivity?: string; // gợi ý hoạt động ngoài màn hình cho phụ huynh (chỉ hiện ở màn hoàn thành)
+  offScreenActivity?: string;
+  completionNarration?: string;
+  status?: 'active' | 'inactive';
 }
