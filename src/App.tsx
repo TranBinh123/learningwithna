@@ -5,6 +5,7 @@ import { PinGate } from '@/screens/parental/PinGate';
 import { ContentManager } from '@/screens/parental/ContentManager';
 import { LessonEditor } from '@/screens/parental/LessonEditor';
 import { useLocalData } from '@/hooks/useLocalData';
+import type { Lesson } from '@/data/schema';
 
 type Screen = 'home' | 'lesson-player' | 'content-manager' | 'lesson-editor';
 
@@ -16,15 +17,19 @@ export default function App() {
     getStarsFor,
     parentLessons,
     addParentLesson,
+    updateParentLesson,
     deleteParentLesson,
+    setParentLessonStatus,
+    setBuiltinLessonStatus,
+    getBuiltinStatus,
     recordCompletion,
   } = useLocalData();
 
   const [screen, setScreen] = useState<Screen>('home');
   const [currentLessonId, setCurrentLessonId] = useState<string>('');
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [showPinGate, setShowPinGate] = useState(false);
 
-  // --- QUẢN LÝ NHẠC NỀN TOÀN CỤC DUY NHẤT TẠI ĐÂY ---
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -64,7 +69,6 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen">
-      {/* Nút bật/tắt nhạc nền ở góc dưới bên trái */}
       <div className="fixed bottom-4 left-4 z-50">
         <button
           onClick={toggleBackgroundMusic}
@@ -75,11 +79,11 @@ export default function App() {
         </button>
       </div>
 
-      {/* Các màn hình điều hướng */}
       {screen === 'home' && (
         <Home
           parentLessons={parentLessons}
           getStarsFor={getStarsFor}
+          getBuiltinStatus={getBuiltinStatus}
           onSelectLesson={id => {
             setCurrentLessonId(id);
             setScreen('lesson-player');
@@ -103,8 +107,18 @@ export default function App() {
           voiceId={voiceId}
           setVoiceId={setVoiceId}
           parentLessons={parentLessons}
+          getBuiltinStatus={getBuiltinStatus}
+          setBuiltinLessonStatus={setBuiltinLessonStatus}
+          setParentLessonStatus={setParentLessonStatus}
           deleteParentLesson={deleteParentLesson}
-          onAddLesson={() => setScreen('lesson-editor')}
+          onAddLesson={() => {
+            setEditingLesson(null);
+            setScreen('lesson-editor');
+          }}
+          onEditLesson={lesson => {
+            setEditingLesson(lesson);
+            setScreen('lesson-editor');
+          }}
           onBack={() => setScreen('home')}
         />
       )}
@@ -112,11 +126,20 @@ export default function App() {
       {screen === 'lesson-editor' && (
         <LessonEditor
           voiceId={voiceId}
+          initialLesson={editingLesson ?? undefined}
           onSave={lesson => {
-            addParentLesson(lesson);
+            if (editingLesson) {
+              updateParentLesson(lesson);
+            } else {
+              addParentLesson(lesson);
+            }
+            setEditingLesson(null);
             setScreen('content-manager');
           }}
-          onCancel={() => setScreen('content-manager')}
+          onCancel={() => {
+            setEditingLesson(null);
+            setScreen('content-manager');
+          }}
         />
       )}
 
