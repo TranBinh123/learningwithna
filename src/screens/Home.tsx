@@ -7,12 +7,15 @@ import type { Lesson } from '@/data/schema';
 interface Props {
   parentLessons: Lesson[];
   getStarsFor: (lessonId: string) => number;
+  getBuiltinStatus: (lessonId: string) => 'active' | 'inactive';
   onSelectLesson: (lessonId: string) => void;
   onOpenParental: () => void;
 }
 
-export function Home({ parentLessons, getStarsFor, onSelectLesson, onOpenParental }: Props) {
-  const allLessons = [...builtinLessons, ...parentLessons];
+export function Home({ parentLessons, getStarsFor, getBuiltinStatus, onSelectLesson, onOpenParental }: Props) {
+  const activeBuiltins = builtinLessons.filter(l => getBuiltinStatus(l.id) === 'active');
+  const activeParentLessons = parentLessons.filter(l => (l.status ?? 'active') === 'active');
+  const allLessons = [...activeBuiltins, ...activeParentLessons];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-yellow-50 to-orange-50 p-6 flex flex-col items-center">
