@@ -73,7 +73,7 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
 <AnimatePresence mode="wait">
   {question.visualEmoji && (
     <motion.div
-      key={`visual-${qIndex}`}  ← THÊM qIndex vào key
+      key={`visual-${qIndex}`}
       initial={{ opacity: 0, scale: 0 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0 }}
