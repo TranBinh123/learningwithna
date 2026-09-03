@@ -1,9 +1,3 @@
-// ============================================================================
-// /api/generate-speech — Vercel Serverless Function
-// Nhận { text, voiceName } từ client, gọi Gemini TTS bằng API key giữ bí mật
-// trên server (KHÔNG BAO GIỜ lộ ra trình duyệt), trả về file audio (WAV).
-// ============================================================================
-
 export const config = {
   runtime: 'nodejs',
 };
@@ -16,7 +10,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const { text, voiceName } = req.body ?? {};
+  const { text, voiceName, styleInstruction } = req.body ?? {};
 
   if (!text || typeof text !== 'string') {
     res.status(400).json({ error: 'Thiếu "text"' });
@@ -30,6 +24,10 @@ export default async function handler(req: any, res: any) {
     res.status(400).json({ error: 'Câu quá dài' });
     return;
   }
+  if (styleInstruction && typeof styleInstruction !== 'string') {
+    res.status(400).json({ error: '"styleInstruction" không hợp lệ' });
+    return;
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -37,23 +35,31 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName } },
-            },
+  const promptText = styleInstruction
+    ? `${styleInstruction}\n\nCâu cần đọc: "${text}"`
+    : `Đọc câu sau bằng tiếng Việt chuẩn, tự nhiên, thân thiện với trẻ em: "${text}"`;
+
+  const callGemini = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName } },
           },
-        }),
-      }
-    );
+        },
+      }),
+    });
+
+  try {
+    let geminiRes = await callGemini();
+
+    if (!geminiRes.ok && geminiRes.status >= 500) {
+      geminiRes = await callGemini();
+    }
 
     if (!geminiRes.ok) {
       const detail = await geminiRes.text().catch(() => '');
@@ -81,8 +87,6 @@ export default async function handler(req: any, res: any) {
   }
 }
 
-// Gemini trả về audio dạng PCM thô (16-bit, mono, 24kHz) — cần bọc header WAV
-// để trình duyệt phát được qua thẻ <audio>.
 function pcmToWav(pcmData: Buffer, sampleRate: number, channels: number, bitsPerSample: number): Buffer {
   const byteRate = (sampleRate * channels * bitsPerSample) / 8;
   const blockAlign = (channels * bitsPerSample) / 8;
