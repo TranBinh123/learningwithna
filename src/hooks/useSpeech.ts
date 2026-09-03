@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchSpeechAudioUrl } from '@/lib/speechCache';
+import { getVoiceProfile } from '@/lib/voiceProfiles';
 
 const MAX_TEXT_LENGTH = 200;
-const AUTOPLAY_DELAY = 100; // Delay để bypass autoplay block
 
 const sanitizeText = (text: string): string => {
   if (!text) return '';
@@ -9,201 +10,144 @@ const sanitizeText = (text: string): string => {
   return cleanText.slice(0, MAX_TEXT_LENGTH);
 };
 
-export function useSpeech(_voiceId?: string) {
+// Phân biệt: đây là đường dẫn tới 1 file âm thanh có sẵn trong public/audios/
+// (vd: "encouragements/enc_1.mp3", "/audios/lessons/lesson_1/1.1.wav"), hay
+// là 1 câu văn tiếng Việt cần đọc bằng giọng nói (Gemini TTS)?
+const isAudioFilePath = (value: string): boolean =>
+  /\.(mp3|wav|ogg|m4a)$/i.test(value.trim()) && !value.includes(' ');
+
+// Đọc 1 câu bằng giọng đọc có sẵn của trình duyệt — dùng khi API TTS lỗi
+// hoặc chưa cấu hình, để bé vẫn nghe được thay vì app im lặng/đứng hình.
+// Không bao giờ reject — luôn resolve dù thành công hay thất bại.
+function speakWithBrowserTTS(text: string): Promise<void> {
+  return new Promise<void>(resolve => {
+    if (!('speechSynthesis' in window) || !text) {
+      resolve();
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('Giọng đọc trình duyệt không khả dụng:', err);
+      resolve();
+    }
+  });
+}
+
+// Phát 1 URL âm thanh (file tĩnh hoặc blob URL từ TTS), có timeout bảo vệ.
+// Không bao giờ reject — luôn resolve dù thành công hay thất bại, để không
+// bao giờ tạo ra unhandled promise rejection ở nơi gọi.
+function playAudioUrl(url: string): Promise<void> {
+  return new Promise<void>(resolve => {
+    let settled = false;
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const timeoutId = setTimeout(() => {
+      console.warn('Quá thời gian tải/phát âm thanh:', url);
+      finish();
+    }, 8000);
+
+    audio.onended = finish;
+    audio.onerror = () => {
+      console.warn('Không tải được âm thanh:', url);
+      finish();
+    };
+
+    audio.play().catch(err => {
+      // Thường gặp nhất: NotAllowedError do chính sách autoplay của trình duyệt
+      console.warn('Không phát được audio:', err);
+      finish();
+    });
+  });
+}
+
+export function useSpeech(voiceId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const isMounted = useRef(true);
-  const retryCountRef = useRef(0);
-  const MAX_RETRIES = 1;
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
-      }
     };
   }, []);
 
   const stop = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsLoading(false);
-    }
+    setIsLoading(false);
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
   }, []);
 
-  // Hàm speak chính — phát file âm thanh từ public/audios/
-  const speak = useCallback(async (audioPath: string) => {
-    if (!audioPath) return;
+  // Hàm speak chính.
+  // - Nếu input là 1 đường dẫn file âm thanh có sẵn -> phát file đó.
+  // - Nếu input là 1 câu văn -> gọi API Gemini TTS (có cache), lỗi thì fallback
+  //   sang giọng đọc trình duyệt. Luôn luôn resolve, không bao giờ throw ra
+  //   ngoài, nên nơi gọi không cần .catch().
+  const speak = useCallback(
+    async (input: string) => {
+      if (!input) return;
 
-    setError(null);
-    setIsLoading(true);
-    retryCountRef.current = 0;
+      setError(null);
+      setIsLoading(true);
 
-    const attemptPlay = async (attempt: number = 0): Promise<void> => {
       try {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.src = '';
-          audioRef.current = null;
+        if (isAudioFilePath(input)) {
+          const fullUrl = input.startsWith('/') ? input : `/audios/${input}`;
+          await playAudioUrl(fullUrl);
+          return;
         }
 
-        // Tự động gán đường dẫn đầy đủ
-        const fullUrl = audioPath.startsWith('/') ? audioPath : `/audios/${audioPath}`;
-        const audio = new Audio();
-        audio.crossOrigin = 'anonymous';
-        audio.preload = 'auto';
-        audio.volume = 1.0;
-        audio.src = fullUrl;
+        const text = sanitizeText(input);
+        const voiceName = getVoiceProfile(voiceId ?? '').geminiVoiceName;
 
-        audioRef.current = audio;
-
-        return new Promise<void>((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            if (isMounted.current) {
-              setError('Quá thời gian tải audio');
-              setIsLoading(false);
-              reject(new Error('Timeout'));
-            }
-          }, 8000);
-
-          audio.oncanplay = () => {
-            // Có thể phát được, nhưng chưa phát ngay
-          };
-
-          audio.onended = () => {
-            clearTimeout(timeoutId);
-            if (isMounted.current) {
-              setIsLoading(false);
-              resolve();
-            }
-          };
-
-          audio.onerror = (e) => {
-            clearTimeout(timeoutId);
-            if (isMounted.current) {
-              const errorMsg = e instanceof Error ? e.message : 'Lỗi tải audio';
-              setError(`Không thể tải: ${errorMsg}`);
-              setIsLoading(false);
-            }
-            reject(e);
-          };
-
-          // Delay phát để autoplay policy không chặn
-          const playTimeoutId = setTimeout(() => {
-            audio
-              .play()
-              .then(() => {
-                clearTimeout(playTimeoutId);
-                // Phát thành công
-              })
-              .catch((playError) => {
-                clearTimeout(playTimeoutId);
-                clearTimeout(timeoutId);
-
-                // Kiểm tra nếu là NotAllowedError (autoplay bị chặn)
-                if (playError.name === 'NotAllowedError') {
-                  console.log('Autoplay bị chặn, fallback sang Speech Synthesis');
-
-                  // Fallback: dùng Web Speech Synthesis API
-                  if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    const text = audioPath;
-
-                    // Nếu audioPath là file path, bỏ qua speech synthesis
-                    if (audioPath.includes('/')) {
-                      // Đây là file path, không phải text
-                      if (isMounted.current) {
-                        setError('Trình duyệt chặn audio, vui lòng tương tác trước');
-                        setIsLoading(false);
-                      }
-                      resolve(); // Không reject, để bé vẫn chơi được
-                    } else {
-                      // Đây có thể là text
-                      const utterance = new SpeechSynthesisUtterance(text);
-                      utterance.lang = 'vi-VN';
-                      utterance.rate = 0.9;
-                      utterance.pitch = 1.0;
-                      utterance.volume = 1.0;
-
-                      utterance.onend = () => {
-                        if (isMounted.current) {
-                          setIsLoading(false);
-                          resolve();
-                        }
-                      };
-
-                      utterance.onerror = (err) => {
-                        console.error('Speech Synthesis error:', err);
-                        if (isMounted.current) {
-                          setIsLoading(false);
-                        }
-                        resolve();
-                      };
-
-                      window.speechSynthesis.speak(utterance);
-                    }
-                  } else {
-                    if (isMounted.current) {
-                      setError('Trình duyệt không hỗ trợ giọng đọc');
-                      setIsLoading(false);
-                    }
-                    resolve();
-                  }
-                } else if (attempt < MAX_RETRIES) {
-                  // Thử lại với delay tăng
-                  console.log(`Retry lần ${attempt + 1}...`);
-                  retryCountRef.current++;
-                  setTimeout(() => attemptPlay(attempt + 1), 500 + attempt * 500);
-                } else {
-                  // Tất cả retry đã hết
-                  if (isMounted.current) {
-                    setError(`Lỗi phát: ${playError.message}`);
-                    setIsLoading(false);
-                  }
-                  reject(playError);
-                }
-              });
-          }, AUTOPLAY_DELAY);
-        });
-      } catch (e) {
-        console.error('Lỗi phát audio:', e);
-        if (isMounted.current) {
-          setIsLoading(false);
+        try {
+          const audioUrl = await fetchSpeechAudioUrl(text, voiceName);
+          await playAudioUrl(audioUrl);
+        } catch (err) {
+          console.warn('Không tạo được giọng đọc từ máy chủ, dùng giọng đọc trình duyệt thay thế:', err);
+          if (isMounted.current) {
+            setError('Chưa kết nối được giọng đọc AI, đang dùng giọng đọc mặc định của máy');
+          }
+          await speakWithBrowserTTS(text);
         }
+      } finally {
+        if (isMounted.current) setIsLoading(false);
       }
-    };
+    },
+    [voiceId]
+  );
 
-    try {
-      await attemptPlay();
-    } catch (e) {
-      console.error('Không thể phát sau retry:', e);
-      // Không throw, để app tiếp tục
-    }
-  }, []);
-
-  // 1. Phát ngẫu nhiên lời động viên (4 file: enc_1 đến enc_4)
+  // Phát ngẫu nhiên lời động viên (4 file: enc_1 đến enc_4)
   const playRandomEncouragement = useCallback(() => {
     const randomIndex = Math.floor(Math.random() * 4) + 1;
     speak(`encouragements/enc_${randomIndex}.mp3`);
   }, [speak]);
 
-  // 2. Phát ngẫu nhiên lời khen ngợi chung (9 file: praise_1 đến praise_9)
+  // Phát ngẫu nhiên lời khen ngợi chung (9 file: praise_1 đến praise_9)
   const playRandomPraise = useCallback(() => {
     const randomIndex = Math.floor(Math.random() * 9) + 1;
     speak(`praises/praise_${randomIndex}.mp3`);
   }, [speak]);
 
-  // 3. Phát âm thanh theo bước bài học
+  // Phát âm thanh theo bước bài học (file tĩnh có sẵn trong public/audios/lessons/)
   const playLessonStep = useCallback(
     (lessonNum: number, step: string, type: 'normal' | 'again' | 'praise' = 'normal') => {
       let fileName = '';
