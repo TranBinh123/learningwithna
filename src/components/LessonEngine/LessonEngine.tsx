@@ -1,76 +1,159 @@
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
+import {
+  motion,
+  AnimatePresence,
+} from 'framer-motion';
+
 import { Star } from 'lucide-react';
+
 import { Mascot } from '@/components/Mascot';
+
 import { SceneIntro } from './SceneIntro';
 import { SceneTeach } from './SceneTeach';
 import { SceneGame } from './SceneGame';
+import { SceneCompare } from './SceneCompare';
 import { SceneReview } from './SceneReview';
+
 import { useSpeech } from '@/hooks/useSpeech';
+
 import type { Lesson } from '@/data/schema';
 
 interface Props {
   lesson: Lesson;
   voiceId: string;
   onExit: () => void;
-  onLessonComplete: (starsEarned: number) => void;
+  onLessonComplete: (
+    starsEarned: number
+  ) => void;
 }
 
-export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Props) {
-  const [sceneIndex, setSceneIndex] = useState(0);
-  const [stars, setStars] = useState(0);
-  const [finished, setFinished] = useState(false);
-  const { speak, isLoading } = useSpeech(voiceId);
+export function LessonEngine({
+  lesson,
+  voiceId,
+  onExit,
+  onLessonComplete,
+}: Props) {
+  const [sceneIndex, setSceneIndex] =
+    useState(0);
 
-  const scene = lesson.scenes[sceneIndex];
+  const [stars, setStars] =
+    useState(0);
+
+  const [finished, setFinished] =
+    useState(false);
+
+  const {
+    speak,
+    isLoading,
+  } = useSpeech(voiceId);
+
+  const scene =
+    lesson.scenes[sceneIndex];
 
   useEffect(() => {
-    if (finished && lesson.completionNarration) {
-      speak(lesson.completionNarration, 'celebratory');
+    if (
+      finished &&
+      lesson.completionNarration
+    ) {
+      speak(
+        lesson.completionNarration,
+        'celebratory'
+      );
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
   const goNext = () => {
-    if (sceneIndex < lesson.scenes.length - 1) {
-      setSceneIndex(i => i + 1);
+    if (
+      sceneIndex <
+      lesson.scenes.length - 1
+    ) {
+      setSceneIndex(
+        index => index + 1
+      );
     } else {
       setFinished(true);
+
       onLessonComplete(stars);
     }
   };
 
-  const awardStar = () => setStars(s => Math.min(lesson.totalStars, s + 1));
+  const awardStar = () => {
+    setStars(current =>
+      Math.min(
+        lesson.totalStars,
+        current + 1
+      )
+    );
+  };
 
   if (finished) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6 bg-gradient-to-b from-yellow-100 to-orange-50">
+
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', bounce: 0.5 }}
+          initial={{
+            scale: 0,
+          }}
+          animate={{
+            scale: 1,
+          }}
+          transition={{
+            type: 'spring',
+            bounce: 0.5,
+          }}
           className="flex flex-col items-center gap-4"
         >
-          <Mascot emoji="🐰" size={110} celebrate />
+          <Mascot
+            emoji="🐰"
+            size={110}
+            celebrate
+          />
 
           <div className="bg-white/90 rounded-3xl p-8 shadow-xl text-center max-w-sm">
+
             <div className="flex justify-center gap-2 mb-6">
-              {Array.from({ length: lesson.totalStars }).map((_, i) => (
+              {Array.from({
+                length:
+                  lesson.totalStars,
+              }).map((_, i) => (
                 <motion.div
                   key={i}
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.2 + i * 0.2 }}
+                  initial={{
+                    scale: 0,
+                    rotate: -180,
+                  }}
+                  animate={{
+                    scale: 1,
+                    rotate: 0,
+                  }}
+                  transition={{
+                    delay:
+                      0.2 + i * 0.2,
+                  }}
                 >
-                  <Star className={`w-14 h-14 ${i < stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`} />
+                  <Star
+                    className={`w-14 h-14 ${
+                      i < stars
+                        ? 'text-yellow-400 fill-yellow-400'
+                        : 'text-gray-200'
+                    }`}
+                  />
                 </motion.div>
               ))}
             </div>
 
             {lesson.offScreenActivity && (
               <div className="bg-orange-50 rounded-2xl p-4 mb-6 text-left">
-                <p className="text-xs font-bold text-orange-400 mb-1">GỢI Ý CHO BA MẸ</p>
-                <p className="text-sm text-gray-600">{lesson.offScreenActivity}</p>
+                <p className="text-xs font-bold text-orange-400 mb-1">
+                  GỢI Ý CHO BA MẸ
+                </p>
+
+                <p className="text-sm text-gray-600">
+                  {lesson.offScreenActivity}
+                </p>
               </div>
             )}
 
@@ -81,6 +164,7 @@ export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Prop
             >
               🏠
             </button>
+
           </div>
         </motion.div>
       </div>
@@ -89,6 +173,7 @@ export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Prop
 
   return (
     <div className="relative">
+
       <button
         onClick={onExit}
         className="fixed top-4 left-4 z-40 bg-white/80 backdrop-blur-sm rounded-full w-12 h-12 shadow-lg flex items-center justify-center text-xl"
@@ -99,7 +184,11 @@ export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Prop
 
       <div className="fixed top-4 right-4 z-40 flex items-center gap-1 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
         <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-        <span className="font-bold text-gray-700">{stars}/{lesson.totalStars}</span>
+
+        <span className="font-bold text-gray-700">
+          {stars}/
+          {lesson.totalStars}
+        </span>
       </div>
 
       {isLoading && (
@@ -109,20 +198,75 @@ export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Prop
       )}
 
       <AnimatePresence mode="wait">
+
         <motion.div
           key={scene.id}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          initial={{
+            opacity: 0,
+          }}
+          animate={{
+            opacity: 1,
+          }}
+          exit={{
+            opacity: 0,
+          }}
+          transition={{
+            duration: 0.25,
+          }}
         >
-          {scene.type === 'intro' && <SceneIntro scene={scene} speak={speak} onNext={goNext} />}
-          {scene.type === 'teach' && <SceneTeach scene={scene} speak={speak} onNext={goNext} />}
-          {scene.type === 'game' && (
-            <SceneGame scene={scene} speak={speak} onStarEarned={awardStar} onNext={goNext} />
+
+          {scene.type ===
+            'intro' && (
+            <SceneIntro
+              scene={scene}
+              speak={speak}
+              onNext={goNext}
+            />
           )}
-          {scene.type === 'review' && <SceneReview scene={scene} speak={speak} onComplete={goNext} />}
+
+          {scene.type ===
+            'teach' && (
+            <SceneTeach
+              scene={scene}
+              speak={speak}
+              onNext={goNext}
+            />
+          )}
+
+          {scene.type ===
+            'compare' && (
+            <SceneCompare
+              scene={scene}
+              speak={speak}
+              onNext={goNext}
+            />
+          )}
+
+          {scene.type ===
+            'game' && (
+            <SceneGame
+              scene={scene}
+              speak={speak}
+              onStarEarned={
+                awardStar
+              }
+              onNext={goNext}
+            />
+          )}
+
+          {scene.type ===
+            'review' && (
+            <SceneReview
+              scene={scene}
+              speak={speak}
+              onComplete={
+                goNext
+              }
+            />
+          )}
+
         </motion.div>
+
       </AnimatePresence>
     </div>
   );
