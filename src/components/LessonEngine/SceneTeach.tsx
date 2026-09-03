@@ -3,10 +3,11 @@ import { motion } from 'framer-motion';
 import { ConceptTile } from '@/components/ConceptTile';
 import { SparkleBurst, nextSparkleId, type Sparkle } from '@/components/Sparkles';
 import type { TeachScene } from '@/data/schema';
+import type { VoiceTone } from '@/lib/voiceProfiles';
 
 interface Props {
   scene: TeachScene;
-  speak: (text: string) => void;
+  speak: (text: string, tone?: VoiceTone) => void;
   onNext: () => void;
 }
 
@@ -16,7 +17,7 @@ export function SceneTeach({ scene, speak, onNext }: Props) {
 
   useEffect(() => {
     setTapped(false);
-    speak(scene.narrationIntro);
+    speak(scene.narrationIntro, 'friendly');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
@@ -27,7 +28,7 @@ export function SceneTeach({ scene, speak, onNext }: Props) {
       { id: nextSparkleId(), x: touch.clientX, y: touch.clientY, emoji: '⭐' },
     ]);
     setTimeout(() => setSparkles([]), 900);
-    speak(scene.narrationOnTap);
+    speak(scene.narrationOnTap, 'happy');
     setTapped(true);
   };
 
@@ -54,7 +55,7 @@ export function SceneTeach({ scene, speak, onNext }: Props) {
           className="flex items-center gap-6"
         >
           <button
-            onClick={() => speak(scene.narrationOnTap)}
+            onClick={() => speak(scene.narrationOnTap, 'happy')}
             className="bg-white/90 rounded-full w-16 h-16 shadow-lg flex items-center justify-center text-2xl"
             aria-label="Nghe lại"
           >
