@@ -1,8 +1,5 @@
 // ============================================================================
 // SCHEMA — kiến trúc data-driven cho toàn bộ app.
-// Nguyên tắc: mọi hướng dẫn (narrationText) LUÔN được đọc bằng giọng nói.
-// Chữ hiển thị (nếu có) chỉ mang tính hỗ trợ, không bao giờ là điều kiện bắt
-// buộc để bé chơi được.
 // ============================================================================
 
 export interface ConceptOption {
@@ -27,6 +24,13 @@ export interface TeachScene {
   narrationOnTap: string;
 }
 
+export interface ClassificationItem {
+  id: string;
+  label: string;
+  emoji: string;
+  shapeId: string;
+}
+
 export interface GameQuestion {
   id: string;
   narrationPrompt: string;
@@ -35,6 +39,21 @@ export interface GameQuestion {
   correctOptionId: string;
   narrationCorrect: string[];
   narrationRetry: string[];
+
+  /**
+   * Nếu true, câu hỏi cho phép chọn nhiều đồ vật.
+   */
+  multiSelect?: boolean;
+
+  /**
+   * Số lượng đáp án đúng cần chọn.
+   */
+  multiSelectCount?: number;
+
+  /**
+   * Danh sách đồ vật dùng cho câu hỏi phân loại.
+   */
+  classificationItems?: ClassificationItem[];
 }
 
 export interface GameScene {
@@ -44,18 +63,51 @@ export interface GameScene {
   questions: GameQuestion[];
 }
 
+export interface CompareScene {
+  type: 'compare';
+  id: string;
+  narrationPrompt: string;
+
+  options: ConceptOption[];
+
+  /**
+   * Lời giải thích khi bé chạm vào từng hình.
+   */
+  followUp: Record<string, string>;
+}
+
 export interface ReviewScene {
   type: 'review';
   id: string;
   narrationPrompt: string;
+
   options: ConceptOption[];
+
   targetOptionId: string;
+
+  /**
+   * streak:
+   *   Cơ chế cũ: trả lời đúng liên tiếp 3 lần.
+   *
+   * classification:
+   *   Trò chơi phân loại đồ vật vào đúng hình.
+   */
+  mode?: 'streak' | 'classification';
+
   requiredCorrectInARow: number;
+
   narrationCorrect: string[];
   narrationRetry: string[];
+
+  classificationItems?: ClassificationItem[];
 }
 
-export type LessonScene = IntroScene | TeachScene | GameScene | ReviewScene;
+export type LessonScene =
+  | IntroScene
+  | TeachScene
+  | GameScene
+  | CompareScene
+  | ReviewScene;
 
 export interface Lesson {
   id: string;
