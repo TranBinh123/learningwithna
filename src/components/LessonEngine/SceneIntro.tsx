@@ -2,16 +2,17 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mascot } from '@/components/Mascot';
 import type { IntroScene } from '@/data/schema';
+import type { VoiceTone } from '@/lib/voiceProfiles';
 
 interface Props {
   scene: IntroScene;
-  speak: (text: string) => void;
+  speak: (text: string, tone?: VoiceTone) => void;
   onNext: () => void;
 }
 
 export function SceneIntro({ scene, speak, onNext }: Props) {
   useEffect(() => {
-    speak(scene.narrationText);
+    speak(scene.narrationText, 'cheerful');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
