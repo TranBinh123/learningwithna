@@ -70,19 +70,20 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8 bg-gradient-to-b from-purple-100 to-pink-50">
       <SparkleBurst sparkles={sparkles} />
-
-      <AnimatePresence mode="wait">
-        {question.visualEmoji && (
-          <motion.div
-            key={question.id}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="text-8xl"
-          >
-            {question.visualEmoji}
-          </motion.div>
-        )}
-      </AnimatePresence>
+<AnimatePresence mode="wait">
+  {question.visualEmoji && (
+    <motion.div
+      key={`visual-${qIndex}`}  ← THÊM qIndex vào key
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0 }}
+      transition={{ duration: 0.3 }}
+      className="text-8xl"
+    >
+      {question.visualEmoji}
+    </motion.div>
+  )}
+</AnimatePresence> 
 
       <motion.div
         animate={shake ? { x: [0, -12, 12, -12, 12, 0] } : {}}
