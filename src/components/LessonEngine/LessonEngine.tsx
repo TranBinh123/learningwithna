@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { Mascot } from '@/components/Mascot';
@@ -23,6 +23,13 @@ export function LessonEngine({ lesson, voiceId, onExit, onLessonComplete }: Prop
   const { speak, isLoading } = useSpeech(voiceId);
 
   const scene = lesson.scenes[sceneIndex];
+
+  useEffect(() => {
+    if (finished && lesson.completionNarration) {
+      speak(lesson.completionNarration, 'celebratory');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished]);
 
   const goNext = () => {
     if (sceneIndex < lesson.scenes.length - 1) {
