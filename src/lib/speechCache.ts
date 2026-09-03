@@ -1,8 +1,3 @@
-// ============================================================================
-// SPEECH CACHE — lưu audio đã tạo (Gemini TTS) vào IndexedDB.
-// Lần đầu nghe 1 câu + 1 giọng: gọi API. Những lần sau: phát từ cache, tức thì.
-// ============================================================================
-
 const DB_NAME = 'be-hoc-vui-speech-cache';
 const STORE_NAME = 'audio';
 const DB_VERSION = 1;
@@ -41,16 +36,16 @@ async function setCachedBlob(key: string, blob: Blob): Promise<void> {
   });
 }
 
-function cacheKey(text: string, geminiVoiceName: string): string {
-  return `${geminiVoiceName}::${text}`;
+function cacheKey(text: string, geminiVoiceName: string, styleInstruction?: string): string {
+  return `${geminiVoiceName}::${styleInstruction ?? ''}::${text}`;
 }
 
-/**
- * Lấy URL audio cho 1 câu + 1 giọng. Kiểm tra cache trước, nếu chưa có thì
- * gọi serverless function /api/generate-speech (giữ API key bí mật ở server).
- */
-export async function fetchSpeechAudioUrl(text: string, geminiVoiceName: string): Promise<string> {
-  const key = cacheKey(text, geminiVoiceName);
+export async function fetchSpeechAudioUrl(
+  text: string,
+  geminiVoiceName: string,
+  styleInstruction?: string
+): Promise<string> {
+  const key = cacheKey(text, geminiVoiceName, styleInstruction);
 
   const cached = await getCachedBlob(key).catch(() => undefined);
   if (cached) {
@@ -60,7 +55,7 @@ export async function fetchSpeechAudioUrl(text: string, geminiVoiceName: string)
   const res = await fetch('/api/generate-speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceName: geminiVoiceName }),
+    body: JSON.stringify({ text, voiceName: geminiVoiceName, styleInstruction }),
   });
 
   if (!res.ok) {
@@ -69,9 +64,7 @@ export async function fetchSpeechAudioUrl(text: string, geminiVoiceName: string)
   }
 
   const blob = await res.blob();
-  await setCachedBlob(key, blob).catch(() => {
-    /* nếu lưu cache lỗi, vẫn cứ phát âm thanh bình thường */
-  });
+  await setCachedBlob(key, blob).catch(() => {});
 
   return URL.createObjectURL(blob);
 }
