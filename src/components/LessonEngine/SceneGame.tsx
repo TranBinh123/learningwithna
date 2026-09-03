@@ -4,10 +4,11 @@ import { Mascot } from '@/components/Mascot';
 import { ConceptTile } from '@/components/ConceptTile';
 import { SparkleBurst, nextSparkleId, type Sparkle } from '@/components/Sparkles';
 import type { GameScene } from '@/data/schema';
+import type { VoiceTone } from '@/lib/voiceProfiles';
 
 interface Props {
   scene: GameScene;
-  speak: (text: string) => void;
+  speak: (text: string, tone?: VoiceTone) => void;
   onStarEarned: () => void;
   onNext: () => void;
 }
@@ -28,7 +29,7 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
   useEffect(() => {
     setAnswered(false);
     setMascotMsg(undefined);
-    const t = setTimeout(() => speak(question.narrationPrompt), 350);
+    const t = setTimeout(() => speak(question.narrationPrompt, 'friendly'), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qIndex]);
@@ -47,7 +48,7 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
 
       const msg = pickRandom(question.narrationCorrect);
       setMascotMsg(msg);
-      speak(msg);
+      speak(msg, 'happy');
       onStarEarned();
 
       setTimeout(() => {
@@ -62,7 +63,7 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
       setTimeout(() => setShake(false), 500);
       const msg = pickRandom(question.narrationRetry);
       setMascotMsg(msg);
-      speak(msg);
+      speak(msg, 'gentle');
       setTimeout(() => setMascotMsg(undefined), 1800);
     }
   };
@@ -70,20 +71,20 @@ export function SceneGame({ scene, speak, onStarEarned, onNext }: Props) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8 bg-gradient-to-b from-purple-100 to-pink-50">
       <SparkleBurst sparkles={sparkles} />
-<AnimatePresence mode="wait">
-  {question.visualEmoji && (
-    <motion.div
-      key={`visual-${qIndex}`}
-      initial={{ opacity: 0, scale: 0 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0 }}
-      transition={{ duration: 0.3 }}
-      className="text-8xl"
-    >
-      {question.visualEmoji}
-    </motion.div>
-  )}
-</AnimatePresence> 
+      <AnimatePresence mode="wait">
+        {question.visualEmoji && (
+          <motion.div
+            key={`visual-${qIndex}`}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ duration: 0.3 }}
+            className="text-8xl"
+          >
+            {question.visualEmoji}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div
         animate={shake ? { x: [0, -12, 12, -12, 12, 0] } : {}}
