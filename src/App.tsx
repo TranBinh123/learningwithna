@@ -115,6 +115,22 @@ export default function App() {
             setEditingLesson(null);
             setScreen('lesson-editor');
           }}
+          onCloneLesson={lesson => {
+            // Built-in lessons are immutable. Create an independent parent-owned copy
+            // so the original lesson remains untouched while the parent can edit it.
+            const clonedLesson: Lesson = {
+              ...lesson,
+              id: `parent-${lesson.id}-${Date.now()}`,
+              createdBy: 'parent',
+              status: 'active',
+              scenes: lesson.scenes.map(scene => ({
+                ...scene,
+                id: `${scene.id}-copy-${Date.now()}`,
+              })),
+            };
+            setEditingLesson(clonedLesson);
+            setScreen('lesson-editor');
+          }}
           onEditLesson={lesson => {
             setEditingLesson(lesson);
             setScreen('lesson-editor');
@@ -128,7 +144,10 @@ export default function App() {
           voiceId={voiceId}
           initialLesson={editingLesson ?? undefined}
           onSave={lesson => {
-            if (editingLesson) {
+            // A copied built-in lesson is not persisted until the parent
+            // presses Save. Existing parent lessons are updated in place.
+            const isExistingParentLesson = parentLessons.some(l => l.id === lesson.id);
+            if (isExistingParentLesson) {
               updateParentLesson(lesson);
             } else {
               addParentLesson(lesson);

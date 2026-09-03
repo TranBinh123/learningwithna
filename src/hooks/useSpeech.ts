@@ -113,8 +113,8 @@ export function useSpeech(voiceId?: string) {
     [stopCurrentAudio]
   );
 
-  const speak = useCallback(
-    async (input: string, tone?: VoiceTone) => {
+  const speakWithVoiceId = useCallback(
+    async (input: string, selectedVoiceId: string, tone?: VoiceTone) => {
       if (!input) return;
 
       const myRequestId = ++requestIdRef.current;
@@ -131,7 +131,7 @@ export function useSpeech(voiceId?: string) {
         }
 
         const text = sanitizeText(input);
-        const profile = getVoiceProfile(voiceId ?? '');
+        const profile = getVoiceProfile(selectedVoiceId);
         const styleInstruction = buildStyleInstruction(profile, tone);
 
         try {
@@ -150,7 +150,12 @@ export function useSpeech(voiceId?: string) {
         if (isMounted.current && myRequestId === requestIdRef.current) setIsLoading(false);
       }
     },
-    [voiceId, playAudioUrl, stopCurrentAudio]
+    [playAudioUrl, stopCurrentAudio]
+  );
+
+  const speak = useCallback(
+    (input: string, tone?: VoiceTone) => speakWithVoiceId(input, voiceId ?? '', tone),
+    [speakWithVoiceId, voiceId]
   );
 
   const playRandomEncouragement = useCallback(() => {
@@ -183,6 +188,7 @@ export function useSpeech(voiceId?: string) {
 
   return {
     speak,
+    speakWithVoiceId,
     playRandomEncouragement,
     playRandomPraise,
     playLessonStep,

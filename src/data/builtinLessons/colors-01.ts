@@ -41,7 +41,7 @@ export const colorsLesson01 = buildLesson({
   ],
   quizPrompts: [
     { narrationPrompt: 'Quả táo màu gì nào?', visualEmoji: '🍎', correctConceptId: 'red' },
-    { narrationPrompt: 'Con hãy chạm vào màu vàng nhé!', correctConceptId: 'yellow' },
+    { narrationPrompt: 'Con hãy chạm vào màu vàng nhé!', visualEmoji: '☀️', correctConceptId: 'yellow' },
     { narrationPrompt: 'Bầu trời có màu gì?', visualEmoji: '☁️', correctConceptId: 'blue' },
   ],
   reviewPrompt: {

@@ -34,6 +34,10 @@ export function SceneReview({ scene, speak, onComplete }: Props) {
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
+    // The final correct answer completes the review immediately; do not
+    // announce the same prompt a fourth time after reaching the target streak.
+    if (streak >= scene.requiredCorrectInARow) return;
+
     const t = setTimeout(() => speak(scene.narrationPrompt, 'friendly'), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Trash2, Plus, Volume2, Pencil, Power } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Volume2, Pencil, Copy, Power } from 'lucide-react';
 import { VOICE_PROFILES } from '@/lib/voiceProfiles';
 import { useSpeech } from '@/hooks/useSpeech';
 import { builtinLessons } from '@/data/registry';
@@ -15,6 +14,7 @@ interface Props {
   setParentLessonStatus: (lessonId: string, status: 'active' | 'inactive') => void;
   deleteParentLesson: (id: string) => void;
   onAddLesson: () => void;
+  onCloneLesson: (lesson: Lesson) => void;
   onEditLesson: (lesson: Lesson) => void;
   onBack: () => void;
 }
@@ -28,16 +28,14 @@ export function ContentManager({
   setParentLessonStatus,
   deleteParentLesson,
   onAddLesson,
+  onCloneLesson,
   onEditLesson,
   onBack,
 }: Props) {
-  const { speak } = useSpeech(voiceId);
-  const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
-  const previewSpeech = useSpeech(previewVoiceId ?? voiceId);
+  const { speakWithVoiceId } = useSpeech(voiceId);
 
   const handlePreview = (id: string) => {
-    setPreviewVoiceId(id);
-    setTimeout(() => previewSpeech.speak('Xin chào, đây là giọng đọc thử nhé!', 'cheerful'), 50);
+    void speakWithVoiceId('Xin chào, đây là giọng đọc thử nhé!', id, 'cheerful');
   };
 
   return (
@@ -93,6 +91,15 @@ export function ContentManager({
                     </span>
                     <span className="text-xs text-gray-400 block">{l.ageGroup} tuổi</span>
                   </div>
+                  <button
+                    onClick={() => onCloneLesson(l)}
+                    className="flex items-center gap-1 text-xs font-bold rounded-full px-3 py-1.5 bg-orange-50 text-orange-500 hover:bg-orange-100"
+                    aria-label="Tạo bản sao để chỉnh sửa"
+                    title="Tạo bản sao để chỉnh sửa"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Tạo bản sao
+                  </button>
                   <button
                     onClick={() => setBuiltinLessonStatus(l.id, isActive ? 'inactive' : 'active')}
                     className={`flex items-center gap-1 text-xs font-bold rounded-full px-3 py-1.5 ${
