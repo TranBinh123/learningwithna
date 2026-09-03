@@ -5,10 +5,11 @@ import { Mascot } from '@/components/Mascot';
 import { ConceptTile } from '@/components/ConceptTile';
 import { SparkleBurst, nextSparkleId, type Sparkle } from '@/components/Sparkles';
 import type { ReviewScene, ConceptOption } from '@/data/schema';
+import type { VoiceTone } from '@/lib/voiceProfiles';
 
 interface Props {
   scene: ReviewScene;
-  speak: (text: string) => void;
+  speak: (text: string, tone?: VoiceTone) => void;
   onComplete: () => void;
 }
 
@@ -33,7 +34,7 @@ export function SceneReview({ scene, speak, onComplete }: Props) {
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => speak(scene.narrationPrompt), 350);
+    const t = setTimeout(() => speak(scene.narrationPrompt, 'friendly'), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streak]);
@@ -52,7 +53,7 @@ export function SceneReview({ scene, speak, onComplete }: Props) {
 
       const msg = pickRandom(scene.narrationCorrect);
       setMascotMsg(msg);
-      speak(msg);
+      speak(msg, 'happy');
 
       if (newStreak >= scene.requiredCorrectInARow) {
         setLocked(true);
@@ -69,7 +70,7 @@ export function SceneReview({ scene, speak, onComplete }: Props) {
       setTimeout(() => setShake(false), 500);
       const msg = pickRandom(scene.narrationRetry);
       setMascotMsg(msg);
-      speak(msg);
+      speak(msg, 'gentle');
     }
   };
 
