@@ -15,20 +15,40 @@ interface ConceptDraft {
 
 interface Props {
   voiceId: string;
+  initialLesson?: Lesson;
   onSave: (lesson: Lesson) => void;
   onCancel: () => void;
 }
 
+const AGE_GROUPS = ['2-3', '3-4', '4-5', '5-6', '6+'];
 const EMOJI_PRESETS = ['🎨', '🐾', '🔢', '🚗', '🍎', '🏠', '🎵', '⭐'];
 
 function emptyConcept(): ConceptDraft {
   return { id: `c${Date.now()}${Math.random()}`, name: '', emoji: '', narrationIntro: '', narrationOnTap: '' };
 }
 
-export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
-  const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState(EMOJI_PRESETS[0]);
-  const [concepts, setConcepts] = useState<ConceptDraft[]>([emptyConcept(), emptyConcept()]);
+function conceptsFromLesson(lesson: Lesson): ConceptDraft[] {
+  const teachScenes = lesson.scenes.filter((s): s is Extract<Lesson['scenes'][number], { type: 'teach' }> =>
+    s.type === 'teach'
+  );
+  if (teachScenes.length === 0) return [emptyConcept(), emptyConcept()];
+  return teachScenes.map(s => ({
+    id: s.concept.id,
+    name: s.concept.name,
+    emoji: s.concept.emoji ?? '',
+    narrationIntro: s.narrationIntro,
+    narrationOnTap: s.narrationOnTap,
+  }));
+}
+
+export function LessonEditor({ voiceId, initialLesson, onSave, onCancel }: Props) {
+  const isEditMode = !!initialLesson;
+  const [title, setTitle] = useState(initialLesson?.title ?? '');
+  const [emoji, setEmoji] = useState(initialLesson?.emoji ?? EMOJI_PRESETS[0]);
+  const [ageGroup, setAgeGroup] = useState(initialLesson?.ageGroup ?? '4-5');
+  const [concepts, setConcepts] = useState<ConceptDraft[]>(
+    initialLesson ? conceptsFromLesson(initialLesson) : [emptyConcept(), emptyConcept()]
+  );
   const { speak } = useSpeech(voiceId);
 
   const updateConcept = (id: string, patch: Partial<ConceptDraft>) => {
@@ -44,15 +64,21 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
 
   const handleSave = () => {
     const validConcepts = concepts.filter(c => c.name.trim() && c.narrationIntro.trim());
-    const lessonId = `parent-${Date.now()}`;
+    const lessonId = initialLesson?.id ?? `parent-${Date.now()}`;
+
+    const existingIntroScene = initialLesson?.scenes.find(
+      (s): s is Extract<Lesson['scenes'][number], { type: 'intro' }> => s.type === 'intro'
+    );
 
     const lesson = buildLesson({
       id: lessonId,
-      ageGroup: '4-5',
+      ageGroup,
       title: title.trim(),
       emoji,
-      defaultVoiceId: voiceId,
-      introNarration: `Chào bé! Hôm nay chúng mình cùng học về ${title.trim().toLowerCase()} nhé!`,
+      defaultVoiceId: initialLesson?.defaultVoiceId ?? voiceId,
+      introNarration:
+        existingIntroScene?.narrationText ??
+        `Chào bé! Hôm nay chúng mình cùng học về ${title.trim().toLowerCase()} nhé!`,
       concepts: validConcepts.map(c => ({
         id: c.id,
         name: c.name.trim(),
@@ -60,7 +86,10 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
         narrationIntro: c.narrationIntro.trim(),
         narrationOnTap: c.narrationOnTap.trim() || c.narrationIntro.trim(),
       })),
+      completionNarration: initialLesson?.completionNarration,
+      offScreenActivity: initialLesson?.offScreenActivity,
       createdBy: 'parent',
+      status: initialLesson?.status ?? 'active',
     });
 
     onSave(lesson);
@@ -72,11 +101,12 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
         <button onClick={onCancel} className="bg-white rounded-full p-3 shadow-md">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <h1 className="text-2xl font-extrabold text-gray-700">Thêm Bài Học Mới</h1>
+        <h1 className="text-2xl font-extrabold text-gray-700">
+          {isEditMode ? 'Chỉnh Sửa Bài Học' : 'Thêm Bài Học Mới'}
+        </h1>
       </div>
 
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        {/* Tên bài học + icon */}
         <section className="bg-white rounded-3xl p-6 shadow-md">
           <label className="block text-sm font-bold text-gray-500 mb-2">Tên bài học</label>
           <input
@@ -85,6 +115,19 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
             placeholder="Ví dụ: Bé học con vật"
             className="w-full border-2 border-gray-100 rounded-2xl px-4 py-3 mb-4 focus:border-orange-300 outline-none"
           />
+
+          <label className="block text-sm font-bold text-gray-500 mb-2">Độ tuổi phù hợp</label>
+          <select
+            value={ageGroup}
+            onChange={e => setAgeGroup(e.target.value)}
+            className="w-full border-2 border-gray-100 rounded-2xl px-4 py-3 mb-4 focus:border-orange-300 outline-none bg-white text-gray-700 font-semibold"
+          >
+            {AGE_GROUPS.map(age => (
+              <option key={age} value={age}>
+                {age} tuổi
+              </option>
+            ))}
+          </select>
 
           <label className="block text-sm font-bold text-gray-500 mb-2">Icon đại diện</label>
           <div className="flex gap-2 flex-wrap">
@@ -102,7 +145,6 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
           </div>
         </section>
 
-        {/* Danh sách khái niệm */}
         <section className="flex flex-col gap-4">
           {concepts.map((c, idx) => (
             <motion.div
@@ -147,7 +189,7 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
                   className="flex-1 border-2 border-gray-100 rounded-2xl px-4 py-2 focus:border-orange-300 outline-none text-sm"
                 />
                 <button
-                  onClick={() => c.narrationIntro.trim() && speak(c.narrationIntro)}
+                  onClick={() => c.narrationIntro.trim() && speak(c.narrationIntro, 'friendly')}
                   className="text-gray-400 hover:text-orange-400 p-2 flex-shrink-0"
                   aria-label="Nghe thử"
                 >
@@ -163,7 +205,7 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
                   className="flex-1 border-2 border-gray-100 rounded-2xl px-4 py-2 focus:border-orange-300 outline-none text-sm"
                 />
                 <button
-                  onClick={() => c.narrationOnTap.trim() && speak(c.narrationOnTap)}
+                  onClick={() => c.narrationOnTap.trim() && speak(c.narrationOnTap, 'happy')}
                   className="text-gray-400 hover:text-orange-400 p-2 flex-shrink-0"
                   aria-label="Nghe thử"
                 >
@@ -182,7 +224,6 @@ export function LessonEditor({ voiceId, onSave, onCancel }: Props) {
         </section>
       </div>
 
-      {/* Nút lưu cố định dưới màn hình */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 flex justify-center">
         <button
           onClick={handleSave}
