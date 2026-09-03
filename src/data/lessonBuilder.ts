@@ -1,13 +1,5 @@
 import type { Lesson, LessonScene, ConceptOption, GameQuestion } from './schema';
 
-// ============================================================================
-// LESSON BUILDER — dựng 1 Lesson hoàn chỉnh (intro → teach từng concept →
-// trò chơi kiểm tra → ôn tập) chỉ từ 1 danh sách concept đơn giản.
-// Dùng cho:
-//  - Nội dung có sẵn (builtinLessons/*.ts)
-//  - Khu quản lý phụ huynh: phụ huynh chỉ cần nhập concept, không cần biết code
-// ============================================================================
-
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -32,15 +24,17 @@ export interface BuildLessonInput {
     name: string;
     emoji?: string;
     hex?: string;
-    narrationIntro: string; // "Đây là màu đỏ"
-    narrationOnTap: string; // "Táo màu đỏ đấy!"
+    narrationIntro: string;
+    narrationOnTap: string;
   }[];
   introNarration: string;
   defaultVoiceId: string;
   quizPrompts?: { narrationPrompt: string; visualEmoji?: string; correctConceptId: string }[];
   reviewPrompt?: { narrationPrompt: string; targetConceptId: string };
   offScreenActivity?: string;
+  completionNarration?: string;
   createdBy?: 'builtin' | 'parent';
+  status?: 'active' | 'inactive';
 }
 
 export function buildLesson(input: BuildLessonInput): Lesson {
@@ -69,7 +63,6 @@ export function buildLesson(input: BuildLessonInput): Lesson {
     ),
   ];
 
-  // Trò chơi kiểm tra — tự tạo câu hỏi nếu có >= 2 concept
   if (options.length >= 2) {
     const prompts: { narrationPrompt: string; visualEmoji?: string; correctConceptId: string }[] =
       input.quizPrompts ??
@@ -100,7 +93,6 @@ export function buildLesson(input: BuildLessonInput): Lesson {
     });
   }
 
-  // Ôn tập cuối bài — cần >= 2 concept để có lựa chọn phân biệt
   if (options.length >= 2) {
     const targetId = input.reviewPrompt?.targetConceptId ?? input.concepts[0].id;
     const targetConcept = input.concepts.find(c => c.id === targetId) ?? input.concepts[0];
@@ -126,5 +118,8 @@ export function buildLesson(input: BuildLessonInput): Lesson {
     createdBy: input.createdBy ?? 'builtin',
     defaultVoiceId: input.defaultVoiceId,
     offScreenActivity: input.offScreenActivity,
+    completionNarration:
+      input.completionNarration ?? `Wow! Bé đã hoàn thành bài học "${input.title}" rồi! Tuyệt vời quá!`,
+    status: input.status ?? 'active',
   };
 }
