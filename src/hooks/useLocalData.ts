@@ -6,6 +6,7 @@ const KEYS = {
   voice: 'behocvui_voice_id',
   progress: 'behocvui_progress',
   parentLessons: 'behocvui_parent_lessons',
+  builtinStatus: 'behocvui_builtin_status',
 };
 
 interface ProgressEntry {
@@ -34,12 +35,14 @@ export function useLocalData() {
   const [voiceId, setVoiceIdState] = useState<string>(DEFAULT_VOICE_ID);
   const [progress, setProgress] = useState<Record<string, ProgressEntry>>({});
   const [parentLessons, setParentLessons] = useState<Lesson[]>([]);
+  const [builtinStatus, setBuiltinStatusState] = useState<Record<string, 'active' | 'inactive'>>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setVoiceIdState(readJson(KEYS.voice, DEFAULT_VOICE_ID));
     setProgress(readJson(KEYS.progress, {}));
     setParentLessons(readJson(KEYS.parentLessons, []));
+    setBuiltinStatusState(readJson(KEYS.builtinStatus, {}));
     setLoaded(true);
   }, []);
 
@@ -76,6 +79,35 @@ export function useLocalData() {
     });
   }, []);
 
+  const updateParentLesson = useCallback((lesson: Lesson) => {
+    setParentLessons(prev => {
+      const updated = prev.map(l => (l.id === lesson.id ? lesson : l));
+      writeJson(KEYS.parentLessons, updated);
+      return updated;
+    });
+  }, []);
+
+  const setParentLessonStatus = useCallback((lessonId: string, status: 'active' | 'inactive') => {
+    setParentLessons(prev => {
+      const updated = prev.map(l => (l.id === lessonId ? { ...l, status } : l));
+      writeJson(KEYS.parentLessons, updated);
+      return updated;
+    });
+  }, []);
+
+  const setBuiltinLessonStatus = useCallback((lessonId: string, status: 'active' | 'inactive') => {
+    setBuiltinStatusState(prev => {
+      const updated = { ...prev, [lessonId]: status };
+      writeJson(KEYS.builtinStatus, updated);
+      return updated;
+    });
+  }, []);
+
+  const getBuiltinStatus = useCallback(
+    (lessonId: string, fallback: 'active' | 'inactive' = 'active') => builtinStatus[lessonId] ?? fallback,
+    [builtinStatus]
+  );
+
   const getStarsFor = useCallback((lessonId: string) => progress[lessonId]?.starsEarned ?? 0, [progress]);
 
   return {
@@ -85,7 +117,11 @@ export function useLocalData() {
     getStarsFor,
     parentLessons,
     addParentLesson,
+    updateParentLesson,
     deleteParentLesson,
+    setParentLessonStatus,
+    setBuiltinLessonStatus,
+    getBuiltinStatus,
     recordCompletion,
   };
 }
