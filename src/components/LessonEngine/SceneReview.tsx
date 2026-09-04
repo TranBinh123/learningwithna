@@ -142,10 +142,12 @@ function ClassificationReview({
   shapeId: string,
   itemOverride?: ClassificationItem
 ) => {
+  if (completed) return;
+
   const item =
     itemOverride ?? selectedItem;
 
-  if (!item || completed) return;
+  if (!item) return;
 
   if (item.shapeId === shapeId) {
     setSparkles([
@@ -163,10 +165,9 @@ function ClassificationReview({
       },
     ]);
 
-    setTimeout(
-      () => setSparkles([]),
-      900
-    );
+    setTimeout(() => {
+      setSparkles([]);
+    }, 900);
 
     const msg = pickRandom(
       scene.narrationCorrect
@@ -238,7 +239,7 @@ const handleDrop = (
 ) => {
   e.preventDefault();
 
-  // Chỉ DragEvent mới có dataTransfer
+  // Chỉ xử lý khi event có dataTransfer
   if (!('dataTransfer' in e)) {
     return;
   }
@@ -260,32 +261,16 @@ const handleDrop = (
     return;
   }
 
-  /*
-   * Không gọi placeItem() ngay sau setSelectedItem().
-   * React cập nhật state bất đồng bộ nên placeItem()
-   * có thể vẫn nhìn thấy selectedItem cũ.
-   */
-  if (item.shapeId === shapeId) {
-    // Đặt item trực tiếp làm selectedItem tạm thời
-    setSelectedItem(item);
+  // Cập nhật giao diện lựa chọn
+  setSelectedItem(item);
 
-    // Dùng timeout rất ngắn để state selectedItem
-    // được cập nhật trước khi xử lý tiếp.
-    setTimeout(() => {
-      placeItem(shapeId);
-    }, 0);
-  } else {
-    setSelectedItem(item);
-
-    const msg = pickRandom(
-      scene.narrationRetry
-    );
-
-    setMascotMsg(msg);
-    speak(msg, 'gentle');
-  }
+  // Truyền item trực tiếp vào hàm xử lý,
+  // không phụ thuộc vào state vừa set.
+  placeItem(
+    shapeId,
+    item
+  );
 };
-
   // --------------------------------------------------------------------------
   // RENDER
   // --------------------------------------------------------------------------
@@ -401,16 +386,14 @@ const handleDrop = (
               whileTap={{
                 scale: 0.96,
               }}
-              onClick={() => {
-                if (
-                  selectedItem
-                ) {
-                  placeItem(
-                    selectedItem,
-                    option.id
-                  );
-                }
-              }}
+            onClick={() => {
+  if (selectedItem) {
+    placeItem(
+      option.id,
+      selectedItem
+    );
+  }
+}}
               onDragOver={event =>
                 event.preventDefault()
               }
