@@ -2,7 +2,12 @@ export const config = {
   runtime: 'nodejs',
 };
 
+// Cho phép function chạy tối đa 30s (thay vì mặc định ~10s của Vercel Hobby) —
+// Gemini TTS đôi khi cần vài giây, tránh bị nền tảng tự ngắt giữa chừng.
+export const maxDuration = 30;
+
 const GEMINI_MODEL = 'gemini-2.5-flash-preview-tts';
+const GEMINI_TIMEOUT_MS = 20000;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -39,10 +44,13 @@ export default async function handler(req: any, res: any) {
     ? `${styleInstruction}\n\nCâu cần đọc: "${text}"`
     : `Đọc câu sau bằng tiếng Việt chuẩn, tự nhiên, thân thiện với trẻ em: "${text}"`;
 
-  const callGemini = () =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+  const callGemini = () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text: promptText }] }],
         generationConfig: {
@@ -52,7 +60,8 @@ export default async function handler(req: any, res: any) {
           },
         },
       }),
-    });
+    }).finally(() => clearTimeout(timeoutId));
+  };
 
   try {
     let geminiRes = await callGemini();
@@ -83,6 +92,10 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.status(200).send(wavBuffer);
   } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      res.status(504).json({ error: 'Gemini TTS quá thời gian phản hồi' });
+      return;
+    }
     res.status(500).json({ error: 'Lỗi server', detail: err?.message ?? String(err) });
   }
 }
