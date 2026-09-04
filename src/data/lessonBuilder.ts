@@ -11,7 +11,11 @@ function shuffle<T>(arr: T[]): T[] {
 
   for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+
+    [copy[i], copy[j]] = [
+      copy[j],
+      copy[i],
+    ];
   }
 
   return copy;
@@ -22,10 +26,49 @@ function pickDistractors(
   correctId: string,
   count: number
 ): ConceptOption[] {
-  const others = all.filter(c => c.id !== correctId);
+  const others = all.filter(
+    concept => concept.id !== correctId
+  );
 
   return shuffle(others).slice(0, count);
 }
+
+// ============================================================================
+// TYPE DỮ LIỆU CHO CÂU HỎI
+// ============================================================================
+
+export interface LessonQuizPrompt {
+  narrationPrompt: string;
+
+  /**
+   * Hình ảnh/emoji minh họa phía trên câu hỏi.
+   */
+  visualEmoji?: string;
+
+  /**
+   * Đáp án đúng đối với dạng single-choice.
+   */
+  correctConceptId: string;
+
+  /**
+   * true = câu hỏi cho phép chọn nhiều đồ vật.
+   */
+  multiSelect?: boolean;
+
+  /**
+   * Số lượng đáp án đúng cần chọn.
+   */
+  multiSelectCount?: number;
+
+  /**
+   * Danh sách đồ vật dùng cho câu hỏi multi-select.
+   */
+  classificationItems?: ClassificationItem[];
+}
+
+// ============================================================================
+// INPUT CHO BUILDER
+// ============================================================================
 
 export interface BuildLessonInput {
   id: string;
@@ -46,16 +89,7 @@ export interface BuildLessonInput {
 
   defaultVoiceId: string;
 
-  quizPrompts?: {
-    narrationPrompt: string;
-    visualEmoji?: string;
-    correctConceptId: string;
-
-    multiSelect?: boolean;
-    multiSelectCount?: number;
-
-    classificationItems?: ClassificationItem[];
-  }[];
+  quizPrompts?: LessonQuizPrompt[];
 
   compareScene?: {
     narrationPrompt: string;
@@ -80,13 +114,20 @@ export interface BuildLessonInput {
   status?: 'active' | 'inactive';
 }
 
-export function buildLesson(input: BuildLessonInput): Lesson {
-  const options: ConceptOption[] = input.concepts.map(c => ({
-    id: c.id,
-    name: c.name,
-    emoji: c.emoji,
-    hex: c.hex,
-  }));
+// ============================================================================
+// BUILD LESSON
+// ============================================================================
+
+export function buildLesson(
+  input: BuildLessonInput
+): Lesson {
+  const options: ConceptOption[] =
+    input.concepts.map(c => ({
+      id: c.id,
+      name: c.name,
+      emoji: c.emoji,
+      hex: c.hex,
+    }));
 
   const scenes: LessonScene[] = [
     // ------------------------------------------------------------------------
@@ -100,20 +141,22 @@ export function buildLesson(input: BuildLessonInput): Lesson {
     },
 
     // ------------------------------------------------------------------------
-    // BƯỚC 2 + 3 — GIỚI THIỆU CÁC CONCEPT
+    // BƯỚC 2 + 3 — GIỚI THIỆU CONCEPT
     // ------------------------------------------------------------------------
     ...input.concepts.map(
       (c): LessonScene => ({
         type: 'teach',
         id: `${input.id}-teach-${c.id}`,
-        narrationIntro: c.narrationIntro,
+        narrationIntro:
+          c.narrationIntro,
         concept: {
           id: c.id,
           name: c.name,
           emoji: c.emoji,
           hex: c.hex,
         },
-        narrationOnTap: c.narrationOnTap,
+        narrationOnTap:
+          c.narrationOnTap,
       })
     ),
   ];
@@ -121,73 +164,132 @@ export function buildLesson(input: BuildLessonInput): Lesson {
   // --------------------------------------------------------------------------
   // BƯỚC 4 — SO SÁNH
   // --------------------------------------------------------------------------
-  if (input.compareScene && options.length >= 2) {
+
+  if (
+    input.compareScene &&
+    options.length >= 2
+  ) {
     scenes.push({
       type: 'compare',
       id: `${input.id}-compare`,
-      narrationPrompt: input.compareScene.narrationPrompt,
+      narrationPrompt:
+        input.compareScene
+          .narrationPrompt,
       options,
-      followUp: input.compareScene.followUp,
+      followUp:
+        input.compareScene.followUp,
     });
   }
 
   // --------------------------------------------------------------------------
-  // BƯỚC 5 — TRÒ CHƠI TÌM HÌNH
+  // BƯỚC 5 — TRÒ CHƠI
   // --------------------------------------------------------------------------
+
   if (options.length >= 2) {
-    const prompts =
+    /**
+     * FIX QUAN TRỌNG:
+     *
+     * Khai báo rõ kiểu LessonQuizPrompt[].
+     *
+     * Trước đây TypeScript suy luận:
+     *
+     * input.quizPrompts ?? fallback
+     *
+     * thành union giữa LessonQuizPrompt và object fallback
+     * chỉ có narrationPrompt + correctConceptId.
+     *
+     * Vì vậy nó báo:
+     *
+     * Property 'visualEmoji' does not exist...
+     *
+     * Bây giờ cả hai nhánh đều có cùng kiểu LessonQuizPrompt.
+     */
+
+    const prompts: LessonQuizPrompt[] =
       input.quizPrompts ??
-      input.concepts.slice(0, 3).map(c => ({
-        narrationPrompt: `Đâu là ${c.name.toLowerCase()} nhỉ?`,
-        correctConceptId: c.id,
-      }));
+      input.concepts.slice(0, 3).map(
+        c => ({
+          narrationPrompt:
+            `Đâu là ${c.name.toLowerCase()} nhỉ?`,
 
-    const questions: GameQuestion[] = prompts.map((p, idx) => {
-      const correct = options.find(
-        o => o.id === p.correctConceptId
+          correctConceptId:
+            c.id,
+        })
       );
 
-      if (!correct) {
-        throw new Error(
-          `Không tìm thấy concept "${p.correctConceptId}" trong lesson "${input.id}".`
-        );
-      }
+    const questions: GameQuestion[] =
+      prompts.map((p, idx) => {
+        const correct =
+          options.find(
+            option =>
+              option.id ===
+              p.correctConceptId
+          );
 
-      const distractors = pickDistractors(
-        options,
-        correct.id,
-        Math.min(2, options.length - 1)
-      );
+        if (!correct) {
+          throw new Error(
+            `Không tìm thấy concept "${p.correctConceptId}" trong lesson "${input.id}".`
+          );
+        }
 
-      return {
-        id: `${input.id}-q${idx + 1}`,
-        narrationPrompt: p.narrationPrompt,
-        visualEmoji: p.visualEmoji,
+        /**
+         * Với multi-select, đáp án không còn là concept tile.
+         * Danh sách classificationItems sẽ được SceneGame
+         * sử dụng trực tiếp.
+         */
+        const distractors =
+          p.multiSelect
+            ? []
+            : pickDistractors(
+                options,
+                correct.id,
+                Math.min(
+                  2,
+                  options.length - 1
+                )
+              );
 
-        options: shuffle([
-          correct,
-          ...distractors,
-        ]),
+        return {
+          id: `${input.id}-q${idx + 1}`,
 
-        correctOptionId: correct.id,
+          narrationPrompt:
+            p.narrationPrompt,
 
-        narrationCorrect: [
-          'Giỏi lắm! Con tìm đúng rồi!',
-          'Chính xác! Con giỏi quá!',
-          'Tuyệt vời! Con tìm được rồi!',
-        ],
+          visualEmoji:
+            p.visualEmoji,
 
-        narrationRetry: [
-          'Gần đúng rồi, mình cùng nhìn kỹ lại nhé!',
-          'Mình thử lại nhé!',
-        ],
+          options: p.multiSelect
+            ? options
+            : shuffle([
+                correct,
+                ...distractors,
+              ]),
 
-        multiSelect: p.multiSelect,
-        multiSelectCount: p.multiSelectCount,
+          correctOptionId:
+            correct.id,
 
-        classificationItems: p.classificationItems,
-      };
-    });
+          narrationCorrect: [
+            'Giỏi lắm! Con tìm đúng rồi!',
+            'Chính xác! Con giỏi quá!',
+            'Tuyệt vời! Con tìm được rồi!',
+          ],
+
+          narrationRetry: [
+            'Gần đúng rồi, mình cùng nhìn kỹ lại nhé!',
+            'Mình thử lại nhé!',
+            'Mình nhìn thật kỹ một lần nữa nào!',
+          ],
+
+          multiSelect:
+            p.multiSelect,
+
+          multiSelectCount:
+            p.multiSelectCount,
+
+          classificationItems:
+            p.classificationItems,
+        };
+      });
 
     scenes.push({
       type: 'game',
@@ -201,13 +303,17 @@ export function buildLesson(input: BuildLessonInput): Lesson {
   // --------------------------------------------------------------------------
   // BƯỚC 6 — ÔN TẬP / PHÂN LOẠI
   // --------------------------------------------------------------------------
+
   if (options.length >= 2) {
     const targetId =
-      input.reviewPrompt?.targetConceptId ??
+      input.reviewPrompt
+        ?.targetConceptId ??
       input.concepts[0].id;
 
     const targetConcept =
-      input.concepts.find(c => c.id === targetId) ??
+      input.concepts.find(
+        c => c.id === targetId
+      ) ??
       input.concepts[0];
 
     scenes.push({
@@ -216,17 +322,27 @@ export function buildLesson(input: BuildLessonInput): Lesson {
       id: `${input.id}-review`,
 
       narrationPrompt:
-        input.reviewPrompt?.narrationPrompt ??
+        input.reviewPrompt
+          ?.narrationPrompt ??
         `Đâu là ${targetConcept.name.toLowerCase()}?`,
 
       options,
 
-      targetOptionId: targetConcept.id,
+      targetOptionId:
+        targetConcept.id,
 
       mode:
         input.reviewPrompt?.mode ??
         'streak',
 
+      /**
+       * Bài 01:
+       *   vẫn giữ 3 lần đúng liên tiếp.
+       *
+       * Bài 02 classification:
+       *   không sử dụng streak này,
+       *   SceneReview sẽ xử lý 4 đồ vật.
+       */
       requiredCorrectInARow: 3,
 
       narrationCorrect: [
@@ -241,22 +357,38 @@ export function buildLesson(input: BuildLessonInput): Lesson {
       ],
 
       classificationItems:
-        input.reviewPrompt?.classificationItems,
+        input.reviewPrompt
+          ?.classificationItems,
     });
   }
 
+  // --------------------------------------------------------------------------
+  // RETURN LESSON
+  // --------------------------------------------------------------------------
+
   return {
     id: input.id,
-    ageGroup: input.ageGroup,
-    title: input.title,
-    emoji: input.emoji,
+
+    ageGroup:
+      input.ageGroup,
+
+    title:
+      input.title,
+
+    emoji:
+      input.emoji,
 
     scenes,
 
+    /**
+     * Bài 02 có 3 câu kiểm tra chính.
+     * Giữ tổng số sao tối đa là 3.
+     */
     totalStars: 3,
 
     createdBy:
-      input.createdBy ?? 'builtin',
+      input.createdBy ??
+      'builtin',
 
     defaultVoiceId:
       input.defaultVoiceId,
@@ -269,6 +401,7 @@ export function buildLesson(input: BuildLessonInput): Lesson {
       `Wow! Bé đã hoàn thành bài học "${input.title}" rồi! Tuyệt vời quá!`,
 
     status:
-      input.status ?? 'active',
+      input.status ??
+      'active',
   };
 }
