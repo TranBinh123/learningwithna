@@ -13,27 +13,64 @@ const sanitizeText = (text: string): string => {
 const isAudioFilePath = (value: string): boolean =>
   /\.(mp3|wav|ogg|m4a)$/i.test(value.trim()) && !value.includes(' ');
 
-function speakWithBrowserTTS(text: string): Promise<void> {
-  return new Promise<void>(resolve => {
-    if (!('speechSynthesis' in window) || !text) {
-      resolve();
+// Lấy voice tiếng Việt thật (không chỉ dựa vào lang='vi-VN', vì nhiều trình
+// duyệt không tự khớp đúng và fallback sang giọng mặc định — thường là giọng
+// Anh, gây hiện tượng "đọc giọng nước ngoài").
+function getVietnameseVoice(): Promise<SpeechSynthesisVoice | null> {
+  return new Promise(resolve => {
+    const pick = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const vi = voices.find(v => v.lang?.toLowerCase().startsWith('vi'));
+      resolve(vi ?? null);
+    };
+    const existing = window.speechSynthesis.getVoices();
+    if (existing.length > 0) {
+      pick();
       return;
     }
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'vi-VN';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      console.warn('Giọng đọc trình duyệt không khả dụng:', err);
-      resolve();
-    }
+    // Voices thường load bất đồng bộ lần đầu — chờ sự kiện, có timeout dự phòng.
+    const onVoicesChanged = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+      pick();
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+    setTimeout(() => {
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+      pick();
+    }, 500);
   });
+}
+
+async function speakWithBrowserTTS(text: string): Promise<void> {
+  if (!('speechSynthesis' in window) || !text) return;
+
+  try {
+    window.speechSynthesis.cancel();
+    const viVoice = await getVietnameseVoice();
+
+    return new Promise<void>(resolve => {
+      // FIX: gọi speak() ngay sau cancel() trong cùng tick có thể bị trình
+      // duyệt (đặc biệt Chrome) âm thầm rớt lệnh — trì hoãn 1 tick để tránh.
+      setTimeout(() => {
+        try {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'vi-VN';
+          if (viVoice) utterance.voice = viVoice;
+          utterance.rate = 0.9;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          utterance.onend = () => resolve();
+          utterance.onerror = () => resolve();
+          window.speechSynthesis.speak(utterance);
+        } catch (err) {
+          console.warn('Giọng đọc trình duyệt không khả dụng:', err);
+          resolve();
+        }
+      }, 50);
+    });
+  } catch (err) {
+    console.warn('Giọng đọc trình duyệt không khả dụng:', err);
+  }
 }
 
 export function useSpeech(voiceId?: string) {
