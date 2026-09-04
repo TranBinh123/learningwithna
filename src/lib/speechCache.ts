@@ -52,11 +52,20 @@ export async function fetchSpeechAudioUrl(
     return URL.createObjectURL(cached);
   }
 
-  const res = await fetch('/api/generate-speech', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceName: geminiVoiceName, styleInstruction }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch('/api/generate-speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ text, voiceName: geminiVoiceName, styleInstruction }),
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
