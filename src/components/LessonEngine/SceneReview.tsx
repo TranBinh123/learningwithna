@@ -4,6 +4,7 @@ import { Star } from 'lucide-react';
 
 import { Mascot } from '@/components/Mascot';
 import { ConceptTile } from '@/components/ConceptTile';
+
 import {
   SparkleBurst,
   nextSparkleId,
@@ -20,23 +21,46 @@ import type { VoiceTone } from '@/lib/voiceProfiles';
 
 interface Props {
   scene: ReviewScene;
-  speak: (text: string, tone?: VoiceTone) => void;
+  speak: (
+    text: string,
+    tone?: VoiceTone
+  ) => void;
   onComplete: () => void;
 }
 
-function pickRandom<T>(arr: T[]): T {
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function pickRandom<T>(
+  arr: T[]
+): T {
   return arr[
-    Math.floor(Math.random() * arr.length)
+    Math.floor(
+      Math.random() * arr.length
+    )
   ];
 }
 
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(
+  arr: T[]
+): T[] {
   const copy = [...arr];
 
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+  for (
+    let i = copy.length - 1;
+    i > 0;
+    i--
+  ) {
+    const j =
+      Math.floor(
+        Math.random() * (i + 1)
+      );
 
-    [copy[i], copy[j]] = [
+    [
+      copy[i],
+      copy[j],
+    ] = [
       copy[j],
       copy[i],
     ];
@@ -55,23 +79,26 @@ function ClassificationReview({
   onComplete,
 }: Props) {
   const items =
-    scene.classificationItems ?? [];
+    scene.classificationItems ??
+    [];
 
   const [remaining, setRemaining] =
-    useState<ClassificationItem[]>(
-      () => shuffle(items)
-    );
+    useState<
+      ClassificationItem[]
+    >(() => shuffle(items));
 
   const [selectedItem, setSelectedItem] =
-    useState<ClassificationItem | null>(
-      null
-    );
+    useState<
+      ClassificationItem | null
+    >(null);
 
   const [sparkles, setSparkles] =
     useState<Sparkle[]>([]);
 
   const [mascotMsg, setMascotMsg] =
-    useState<string | undefined>();
+    useState<
+      string | undefined
+    >();
 
   const [completed, setCompleted] =
     useState(false);
@@ -84,10 +111,15 @@ function ClassificationReview({
       );
     }, 350);
 
-    return () => clearTimeout(timer);
+    return () =>
+      clearTimeout(timer);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
+
+  // --------------------------------------------------------------------------
+  // CHỌN ĐỒ VẬT
+  // --------------------------------------------------------------------------
 
   const chooseItem = (
     item: ClassificationItem
@@ -102,25 +134,38 @@ function ClassificationReview({
     );
   };
 
+  // --------------------------------------------------------------------------
+  // ĐƯA ĐỒ VẬT VÀO NHÀ
+  // --------------------------------------------------------------------------
+
   const placeItem = (
+    item: ClassificationItem,
     shapeId: string
   ) => {
-    if (!selectedItem || completed) return;
+    if (completed) return;
 
-    if (selectedItem.shapeId === shapeId) {
-      const item = selectedItem;
-
+    if (
+      item.shapeId === shapeId
+    ) {
       setSparkles([
         {
           id: nextSparkleId(),
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
+          x:
+            window.innerWidth /
+            2,
+          y:
+            window.innerHeight /
+            2,
           emoji: '⭐',
         },
         {
           id: nextSparkleId(),
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
+          x:
+            window.innerWidth /
+            2,
+          y:
+            window.innerHeight /
+            2,
           emoji: '✨',
         },
       ]);
@@ -141,17 +186,24 @@ function ClassificationReview({
       setSelectedItem(null);
 
       setRemaining(prev => {
-        const next = prev.filter(
-          current =>
-            current.id !== item.id
-        );
+        const next =
+          prev.filter(
+            current =>
+              current.id !==
+              item.id
+          );
 
-        if (next.length === 0) {
+        if (
+          next.length === 0
+        ) {
           setCompleted(true);
 
-          setTimeout(() => {
-            onComplete();
-          }, 1800);
+          setTimeout(
+            () => {
+              onComplete();
+            },
+            1800
+          );
         }
 
         return next;
@@ -167,26 +219,60 @@ function ClassificationReview({
     }
   };
 
+  // --------------------------------------------------------------------------
+  // FIX DRAG & DROP
+  //
+  // Không lấy dataTransfer từ event của motion.button.
+  //
+  // Framer Motion có thể suy luận onDragStart thành:
+  // MouseEvent | TouchEvent | PointerEvent
+  //
+  // Ta dùng selectedItem làm state chính.
+  // --------------------------------------------------------------------------
+
+  const handleDragStart = (
+    event: React.DragEvent<HTMLButtonElement>,
+    item: ClassificationItem
+  ) => {
+    event.dataTransfer.effectAllowed =
+      'move';
+
+    event.dataTransfer.setData(
+      'classification-item',
+      item.id
+    );
+
+    setSelectedItem(item);
+  };
+
   const handleDrop = (
-    e: React.DragEvent,
+    event: React.DragEvent<HTMLButtonElement>,
     shapeId: string
   ) => {
-    e.preventDefault();
+    event.preventDefault();
 
     const itemId =
-      e.dataTransfer.getData(
+      event.dataTransfer.getData(
         'classification-item'
       );
 
-    const item = remaining.find(
-      current => current.id === itemId
-    );
+    const item =
+      remaining.find(
+        current =>
+          current.id === itemId
+      );
 
     if (item) {
-      setSelectedItem(item);
-      placeItem(shapeId);
+      placeItem(
+        item,
+        shapeId
+      );
     }
   };
+
+  // --------------------------------------------------------------------------
+  // RENDER
+  // --------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-5 gap-6 bg-gradient-to-b from-amber-50 via-white to-green-50">
@@ -195,14 +281,23 @@ function ClassificationReview({
         sparkles={sparkles}
       />
 
+      {/* ------------------------------------------------------------------ */}
+      {/* TIẾN ĐỘ */}
+      {/* ------------------------------------------------------------------ */}
+
       <div className="flex items-center gap-3">
         <Star className="w-8 h-8 text-yellow-400 fill-yellow-400" />
 
         <span className="font-extrabold text-gray-600">
-          {items.length - remaining.length}
+          {items.length -
+            remaining.length}
           /{items.length}
         </span>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TIÊU ĐỀ */}
+      {/* ------------------------------------------------------------------ */}
 
       <div className="text-center">
         <div className="text-sm font-bold text-orange-400 mb-1">
@@ -210,9 +305,14 @@ function ClassificationReview({
         </div>
 
         <h2 className="text-2xl md:text-3xl font-extrabold text-gray-700">
-          Đưa từng đồ vật về đúng ngôi nhà nhé!
+          Đưa từng đồ vật về đúng
+          ngôi nhà nhé!
         </h2>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* BÉ THỎ */}
+      {/* ------------------------------------------------------------------ */}
 
       <Mascot
         emoji="🐰"
@@ -226,6 +326,7 @@ function ClassificationReview({
 
       <div className="bg-white/80 rounded-3xl shadow-lg p-5 w-full max-w-3xl">
         <div className="flex flex-wrap justify-center gap-4 min-h-[130px]">
+
           {remaining.map(item => (
             <motion.button
               key={item.id}
@@ -236,21 +337,24 @@ function ClassificationReview({
               whileTap={{
                 scale: 0.92,
               }}
-              onDragStart={e => {
-                e.dataTransfer.setData(
-                  'classification-item',
-                  item.id
-                );
-              }}
+              onDragStart={event =>
+                handleDragStart(
+                  event as unknown as React.DragEvent<HTMLButtonElement>,
+                  item
+                )
+              }
               onClick={() =>
                 chooseItem(item)
               }
               className={`w-28 h-28 rounded-3xl bg-white shadow-md border-4 flex flex-col items-center justify-center ${
-                selectedItem?.id === item.id
+                selectedItem?.id ===
+                item.id
                   ? 'border-orange-400 bg-orange-50'
                   : 'border-white'
               }`}
-              aria-label={item.label}
+              aria-label={
+                item.label
+              }
             >
               <span className="text-5xl">
                 {item.emoji}
@@ -261,6 +365,7 @@ function ClassificationReview({
               </span>
             </motion.button>
           ))}
+
         </div>
       </div>
 
@@ -270,46 +375,65 @@ function ClassificationReview({
 
       <div className="grid grid-cols-2 gap-5 w-full max-w-xl">
 
-        {scene.options.map(option => (
-          <motion.button
-            key={option.id}
-            whileHover={{
-              scale: 1.04,
-            }}
-            whileTap={{
-              scale: 0.96,
-            }}
-            onClick={() =>
-              placeItem(option.id)
-            }
-            onDragOver={e =>
-              e.preventDefault()
-            }
-            onDrop={e =>
-              handleDrop(e, option.id)
-            }
-            className="min-h-[180px] rounded-[2rem] bg-white shadow-xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3"
-            style={{
-              borderColor:
-                option.hex ?? '#E5E7EB',
-            }}
-          >
-            <ConceptTile
-              concept={option}
-              size={100}
-            />
+        {scene.options.map(
+          option => (
+            <motion.button
+              key={option.id}
+              whileHover={{
+                scale: 1.04,
+              }}
+              whileTap={{
+                scale: 0.96,
+              }}
+              onClick={() => {
+                if (
+                  selectedItem
+                ) {
+                  placeItem(
+                    selectedItem,
+                    option.id
+                  );
+                }
+              }}
+              onDragOver={event =>
+                event.preventDefault()
+              }
+              onDrop={event =>
+                handleDrop(
+                  event as unknown as React.DragEvent<HTMLButtonElement>,
+                  option.id
+                )
+              }
+              className="min-h-[180px] rounded-[2rem] bg-white shadow-xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3"
+              style={{
+                borderColor:
+                  option.hex ??
+                  '#E5E7EB',
+              }}
+            >
+              <ConceptTile
+                concept={option}
+                size={100}
+              />
 
-            <span className="font-extrabold text-gray-600">
-              Nhà {option.name.toLowerCase()}
-            </span>
+              <span className="font-extrabold text-gray-600">
+                Nhà{' '}
+                {option.name.toLowerCase()}
+              </span>
 
-            <span className="text-xs text-gray-400">
-              Kéo hoặc chạm đồ vật vào đây
-            </span>
-          </motion.button>
-        ))}
+              <span className="text-xs text-gray-400">
+                Kéo hoặc chạm đồ vật
+                vào đây
+              </span>
+            </motion.button>
+          )
+        )}
 
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* HOÀN THÀNH */}
+      {/* ------------------------------------------------------------------ */}
 
       {completed && (
         <motion.div
@@ -328,16 +452,18 @@ function ClassificationReview({
           </div>
 
           <div className="font-extrabold text-orange-500">
-            Bé phân loại rất giỏi!
+            Bé phân loại rất
+            giỏi!
           </div>
         </motion.div>
       )}
+
     </div>
   );
 }
 
 // ============================================================================
-// REVIEW DẠNG STREAK — GIỮ NGUYÊN CƠ CHẾ CỦA BÀI 01
+// REVIEW DẠNG STREAK
 // ============================================================================
 
 function StreakReview({
@@ -349,7 +475,9 @@ function StreakReview({
     useState(0);
 
   const [order, setOrder] =
-    useState<ConceptOption[]>(() =>
+    useState<
+      ConceptOption[]
+    >(() =>
       shuffle(scene.options)
     );
 
@@ -360,7 +488,9 @@ function StreakReview({
     useState(false);
 
   const [mascotMsg, setMascotMsg] =
-    useState<string | undefined>();
+    useState<
+      string | undefined
+    >();
 
   const [locked, setLocked] =
     useState(false);
@@ -373,14 +503,18 @@ function StreakReview({
       return;
     }
 
-    const timer = setTimeout(() => {
-      speak(
-        scene.narrationPrompt,
-        'friendly'
-      );
-    }, 350);
+    const timer = setTimeout(
+      () => {
+        speak(
+          scene.narrationPrompt,
+          'friendly'
+        );
+      },
+      350
+    );
 
-    return () => clearTimeout(timer);
+    return () =>
+      clearTimeout(timer);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streak]);
@@ -393,7 +527,7 @@ function StreakReview({
   ) => {
     if (locked) return;
 
-    const touch =
+    const point =
       'touches' in e
         ? e.touches[0]
         : e;
@@ -408,14 +542,14 @@ function StreakReview({
       setSparkles([
         {
           id: nextSparkleId(),
-          x: touch.clientX,
-          y: touch.clientY,
+          x: point.clientX,
+          y: point.clientY,
           emoji: '⭐',
         },
         {
           id: nextSparkleId(),
-          x: touch.clientX,
-          y: touch.clientY,
+          x: point.clientX,
+          y: point.clientY,
           emoji: '🌟',
         },
       ]);
@@ -445,16 +579,23 @@ function StreakReview({
           1500
         );
       } else {
-        setStreak(newStreak);
+        setStreak(
+          newStreak
+        );
+
         setOrder(
-          shuffle(scene.options)
+          shuffle(
+            scene.options
+          )
         );
       }
     } else {
       setStreak(0);
 
       setOrder(
-        shuffle(scene.options)
+        shuffle(
+          scene.options
+        )
       );
 
       setShake(true);
@@ -481,6 +622,7 @@ function StreakReview({
         sparkles={sparkles}
       />
 
+      {/* SAO */}
       <div className="flex gap-2">
         {Array.from({
           length:
@@ -497,6 +639,7 @@ function StreakReview({
         ))}
       </div>
 
+      {/* HÌNH */}
       <motion.div
         animate={
           shake
@@ -517,19 +660,21 @@ function StreakReview({
         }}
         className="flex gap-5"
       >
-        {order.map(option => (
-          <ConceptTile
-            key={option.id}
-            concept={option}
-            onTap={e =>
-              handleChoose(
-                option.id,
-                e
-              )
-            }
-            disabled={locked}
-          />
-        ))}
+        {order.map(
+          option => (
+            <ConceptTile
+              key={option.id}
+              concept={option}
+              onTap={e =>
+                handleChoose(
+                  option.id,
+                  e
+                )
+              }
+              disabled={locked}
+            />
+          )
+        )}
       </motion.div>
 
       <Mascot
