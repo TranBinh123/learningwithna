@@ -139,86 +139,69 @@ function ClassificationReview({
   // --------------------------------------------------------------------------
 
   const placeItem = (
-    item: ClassificationItem,
-    shapeId: string
-  ) => {
-    if (completed) return;
+  shapeId: string,
+  itemOverride?: ClassificationItem
+) => {
+  const item =
+    itemOverride ?? selectedItem;
 
-    if (
-      item.shapeId === shapeId
-    ) {
-      setSparkles([
-        {
-          id: nextSparkleId(),
-          x:
-            window.innerWidth /
-            2,
-          y:
-            window.innerHeight /
-            2,
-          emoji: '⭐',
-        },
-        {
-          id: nextSparkleId(),
-          x:
-            window.innerWidth /
-            2,
-          y:
-            window.innerHeight /
-            2,
-          emoji: '✨',
-        },
-      ]);
+  if (!item || completed) return;
 
-      setTimeout(
-        () => setSparkles([]),
-        900
+  if (item.shapeId === shapeId) {
+    setSparkles([
+      {
+        id: nextSparkleId(),
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        emoji: '⭐',
+      },
+      {
+        id: nextSparkleId(),
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        emoji: '✨',
+      },
+    ]);
+
+    setTimeout(
+      () => setSparkles([]),
+      900
+    );
+
+    const msg = pickRandom(
+      scene.narrationCorrect
+    );
+
+    setMascotMsg(msg);
+    speak(msg, 'happy');
+
+    setSelectedItem(null);
+
+    setRemaining(prev => {
+      const next = prev.filter(
+        current =>
+          current.id !== item.id
       );
 
-      const msg = pickRandom(
-        scene.narrationCorrect
-      );
+      if (next.length === 0) {
+        setCompleted(true);
 
-      setMascotMsg(msg);
+        setTimeout(() => {
+          onComplete();
+        }, 1800);
+      }
 
-      speak(msg, 'happy');
+      return next;
+    });
+  } else {
+    const msg = pickRandom(
+      scene.narrationRetry
+    );
 
-      setSelectedItem(null);
-
-      setRemaining(prev => {
-        const next =
-          prev.filter(
-            current =>
-              current.id !==
-              item.id
-          );
-
-        if (
-          next.length === 0
-        ) {
-          setCompleted(true);
-
-          setTimeout(
-            () => {
-              onComplete();
-            },
-            1800
-          );
-        }
-
-        return next;
-      });
-    } else {
-      const msg = pickRandom(
-        scene.narrationRetry
-      );
-
-      setMascotMsg(msg);
-
-      speak(msg, 'gentle');
-    }
-  };
-
+    setMascotMsg(msg);
+    speak(msg, 'gentle');
+  }
+};
   // --------------------------------------------------------------------------
   // FIX DRAG & DROP
   //
@@ -245,30 +228,63 @@ function ClassificationReview({
     setSelectedItem(item);
   };
 
-  const handleDrop = (
-    event: React.DragEvent<HTMLButtonElement>,
-    shapeId: string
-  ) => {
-    event.preventDefault();
+const handleDrop = (
+  e:
+    | React.MouseEvent
+    | React.TouchEvent
+    | React.PointerEvent
+    | React.DragEvent,
+  shapeId: string
+) => {
+  e.preventDefault();
 
-    const itemId =
-      event.dataTransfer.getData(
-        'classification-item'
-      );
+  // Chỉ DragEvent mới có dataTransfer
+  if (!('dataTransfer' in e)) {
+    return;
+  }
 
-    const item =
-      remaining.find(
-        current =>
-          current.id === itemId
-      );
+  const itemId =
+    e.dataTransfer.getData(
+      'classification-item'
+    );
 
-    if (item) {
-      placeItem(
-        item,
-        shapeId
-      );
-    }
-  };
+  if (!itemId) {
+    return;
+  }
+
+  const item = remaining.find(
+    current => current.id === itemId
+  );
+
+  if (!item) {
+    return;
+  }
+
+  /*
+   * Không gọi placeItem() ngay sau setSelectedItem().
+   * React cập nhật state bất đồng bộ nên placeItem()
+   * có thể vẫn nhìn thấy selectedItem cũ.
+   */
+  if (item.shapeId === shapeId) {
+    // Đặt item trực tiếp làm selectedItem tạm thời
+    setSelectedItem(item);
+
+    // Dùng timeout rất ngắn để state selectedItem
+    // được cập nhật trước khi xử lý tiếp.
+    setTimeout(() => {
+      placeItem(shapeId);
+    }, 0);
+  } else {
+    setSelectedItem(item);
+
+    const msg = pickRandom(
+      scene.narrationRetry
+    );
+
+    setMascotMsg(msg);
+    speak(msg, 'gentle');
+  }
+};
 
   // --------------------------------------------------------------------------
   // RENDER
